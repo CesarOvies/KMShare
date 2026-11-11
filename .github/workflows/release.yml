@@ -87,7 +87,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File .\build-all.ps1 `
+          & .\build-all.ps1 `
             -Version $env:VERSION `
             -Configuration Release `
             -PackageAll `

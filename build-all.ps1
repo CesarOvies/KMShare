@@ -13,14 +13,14 @@ $publishBase = Join-Path $PSScriptRoot "publish"
 $distBase = Join-Path $PSScriptRoot "dist"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  KMShare — Pipeline de Compilação Multiplataforma (.NET 10)" -ForegroundColor Cyan
-Write-Host "  Versão: $Version | Config: $Configuration | Self-Contained: $SelfContained" -ForegroundColor Cyan
+Write-Host "  KMShare - Pipeline de Compilacao Multiplataforma (.NET 10)" -ForegroundColor Cyan
+Write-Host "  Versao: $Version | Config: $Configuration | Self-Contained: $SelfContained" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Compilação Single-File para cada RID
+# 1. Compilacao Single-File para cada RID
 foreach ($rid in $Runtimes) {
     $outDir = Join-Path $publishBase $rid
-    Write-Host "`n[1/3] Publicando KMShare & KMShare.Updater ($rid)..." -ForegroundColor Yellow
+    Write-Host "`n[1/3] Publicando KMShare e KMShare.Updater ($rid)..." -ForegroundColor Yellow
 
     dotnet publish "$PSScriptRoot\KMShare.csproj" `
         -c $Configuration `
@@ -42,12 +42,12 @@ foreach ($rid in $Runtimes) {
 
     if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar KMShare.Updater para $rid" }
 
-    Write-Host "  -> Concluído com sucesso para $rid" -ForegroundColor Green
+    Write-Host "  -> Concluido com sucesso para $rid" -ForegroundColor Green
 }
 
 # 2. Empacotamento de Portables e Instaladores (se solicitado)
 if ($PackageAll) {
-    Write-Host "`n[2/3] Gerando pacotes de distribuição (Portables & Instaladores)..." -ForegroundColor Yellow
+    Write-Host "`n[2/3] Gerando pacotes de distribuicao (Portables e Instaladores)..." -ForegroundColor Yellow
     if (-not (Test-Path $distBase)) {
         New-Item -ItemType Directory -Path $distBase -Force | Out-Null
     }
@@ -76,7 +76,7 @@ if ($PackageAll) {
         # Script Instalador User-Space
         Copy-Item "$PSScriptRoot\packaging\windows\Install-KMShare.ps1" (Join-Path $distBase "Install-KMShare.ps1") -Force
 
-        # Inno Setup Installer (se compiler disponível)
+        # Inno Setup Installer (se compiler disponivel)
         $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
         if (-not $iscc) {
             $isccCandidates = @(
@@ -96,10 +96,10 @@ if ($PackageAll) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  -> Instalador Windows (.exe) gerado com sucesso via Inno Setup!" -ForegroundColor Green
             } else {
-                Write-Warning "Falha ao compilar com Inno Setup (código $LASTEXITCODE)."
+                Write-Warning "Falha ao compilar com Inno Setup (codigo $LASTEXITCODE)."
             }
         } else {
-            Write-Host "  -> [INFO] Inno Setup (iscc.exe) não localizado no ambiente. O instalador standalone 'Install-KMShare.ps1' está pronto no diretório dist." -ForegroundColor Yellow
+            Write-Host "  -> [INFO] Inno Setup (iscc.exe) nao localizado. Instalador standalone Install-KMShare.ps1 disponivel em dist." -ForegroundColor Yellow
         }
     }
 
@@ -162,8 +162,8 @@ if ($PackageAll) {
         & "$PSScriptRoot\packaging\macos\build-macos.ps1" -PublishDir $macPub -OutputDir $distBase -Version $Version
     }
 
-    # 3. Geração de Checksums Criptográficos (SHA-256 e SHA-512)
-    Write-Host "`nCalculando Checksums Criptográficos de todos os pacotes..." -ForegroundColor Cyan
+    # 3. Geracao de Checksums Criptograficos (SHA-256 e SHA-512)
+    Write-Host "`nCalculando Checksums Criptograficos de todos os pacotes..." -ForegroundColor Cyan
     $distFiles = Get-ChildItem -Path $distBase -File | Where-Object { $_.Extension -ne ".sha256" -and $_.Extension -ne ".sha512" }
 
     $sha256Lines = @()
@@ -184,25 +184,25 @@ if ($PackageAll) {
     Write-Host "  -> Checksums gravados em CHECKSUMS.sha256 e CHECKSUMS.sha512" -ForegroundColor Green
 }
 
-# 4. Scan de Antivírus com Microsoft Defender (se solicitado)
+# 4. Scan de Antivirus com Microsoft Defender (se solicitado)
 if ($ScanDefender) {
-    Write-Host "`n[3/3] Executando Scan de Segurança com Microsoft Defender Antivirus..." -ForegroundColor Yellow
+    Write-Host "`n[3/3] Executando Scan de Seguranca com Microsoft Defender Antivirus..." -ForegroundColor Yellow
     $mpCmdRun = "$env:ProgramFiles\Windows Defender\MpCmdRun.exe"
     $scanTarget = (Resolve-Path $distBase).Path
 
     if (Test-Path $mpCmdRun) {
-        Write-Host "Iniciando varredura profunda no diretório $scanTarget..." -ForegroundColor Cyan
+        Write-Host "Iniciando varredura profunda no diretorio $scanTarget..." -ForegroundColor Cyan
         & $mpCmdRun -Scan -ScanType 3 -File $scanTarget
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "  [OK] Microsoft Defender Antivirus: 0 ameaças detectadas em todos os binários e instaladores!" -ForegroundColor Green
+            Write-Host "  [OK] Microsoft Defender Antivirus: 0 ameacas detectadas em todos os binarios e instaladores!" -ForegroundColor Green
         } else {
-            throw "Microsoft Defender detectou ameaça de segurança ou erro durante o scan! Código de saída: $LASTEXITCODE"
+            throw "Microsoft Defender detectou ameaca de seguranca ou erro durante o scan! Codigo de saida: $LASTEXITCODE"
         }
     } else {
-        Write-Warning "MpCmdRun.exe não encontrado em '$mpCmdRun'. Scanner Defender local indisponível."
+        Write-Warning "MpCmdRun.exe nao encontrado em '$mpCmdRun'. Scanner Defender local indisponivel."
     }
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "  Build e empacotamento concluídos com sucesso!" -ForegroundColor Green
+Write-Host "  Build e empacotamento concluidos com sucesso!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
