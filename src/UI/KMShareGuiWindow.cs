@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -251,6 +251,8 @@ public static partial class KMShareGuiWindow
         private RECT _rcCardLog;
 
         private IntPtr _hwndMain;
+        private IntPtr _hAppIconBig = IntPtr.Zero;
+        private IntPtr _hAppIconSmall = IntPtr.Zero;
         private IntPtr _fontHeaderTitle;
         private IntPtr _fontHeaderSub;
         private IntPtr _fontSectionTitle;
@@ -336,6 +338,7 @@ public static partial class KMShareGuiWindow
 
         public void RunMessageLoop()
         {
+            try { _ = SetCurrentProcessExplicitAppUserModelID("KMShare.KVM"); } catch { }
             try { SetProcessDPIAware(); } catch { }
 
             IntPtr hdcScreen = GetDC(IntPtr.Zero);
@@ -357,11 +360,7 @@ public static partial class KMShareGuiWindow
             InitCommonControlsEx(ref icc);
 
             IntPtr hInstance = GetModuleHandleW(null);
-            IntPtr hAppIcon = LoadIconW(hInstance, 1);
-            if (hAppIcon == IntPtr.Zero)
-            {
-                hAppIcon = LoadIconW(IntPtr.Zero, 32512);
-            }
+            (_hAppIconBig, _hAppIconSmall) = LoadAppIcons(hInstance);
             IntPtr classNamePtr = Marshal.StringToHGlobalUni(WindowClassName);
             try
             {
@@ -371,10 +370,11 @@ public static partial class KMShareGuiWindow
                     style = 0x0003,
                     lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
                     hInstance = hInstance,
-                    hIcon = hAppIcon,
+                    hIcon = _hAppIconBig,
                     hCursor = LoadCursorW(IntPtr.Zero, 32512),
                     hbrBackground = IntPtr.Zero,
-                    lpszClassName = classNamePtr
+                    lpszClassName = classNamePtr,
+                    hIconSm = _hAppIconSmall
                 };
                 RegisterClassExW(ref wc);
             }
@@ -398,8 +398,14 @@ public static partial class KMShareGuiWindow
                 posX, posY, winW, winH,
                 IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
 
-            SendMessageW(_hwndMain, WM_SETICON, 1 /* ICON_BIG */, hAppIcon);
-            SendMessageW(_hwndMain, WM_SETICON, 0 /* ICON_SMALL */, hAppIcon);
+            if (_hAppIconBig != IntPtr.Zero)
+            {
+                _ = SendMessageW(_hwndMain, WM_SETICON, 1 /* ICON_BIG */, _hAppIconBig);
+            }
+            if (_hAppIconSmall != IntPtr.Zero)
+            {
+                _ = SendMessageW(_hwndMain, WM_SETICON, 0 /* ICON_SMALL */, _hAppIconSmall);
+            }
 
             int isDarkInit = _currentPalette.IsDarkTitleBar ? 1 : 0;
             _ = DwmSetWindowAttribute(_hwndMain, DWMWA_USE_IMMERSIVE_DARK_MODE, ref isDarkInit, sizeof(int));
@@ -469,6 +475,91 @@ public static partial class KMShareGuiWindow
                 hid.OnRemoteStateChanged -= remoteStateSubscriber;
                 StopActiveSession();
             }
+        }
+
+        private static (IntPtr Big, IntPtr Small) LoadAppIcons(IntPtr hInstance)
+        {
+            IntPtr hBig = IntPtr.Zero;
+            IntPtr hSmall = IntPtr.Zero;
+
+            // 1. Extração direta de ícones (alta fidelidade) do executável em execução
+            try
+            {
+                string? procPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(procPath) && File.Exists(procPath))
+                {
+                    uint count = ExtractIconExW(procPath, 0, out IntPtr big, out IntPtr small, 1);
+                    if (count > 0)
+                    {
+                        if (big != IntPtr.Zero) hBig = big;
+                        if (small != IntPtr.Zero) hSmall = small;
+                    }
+                }
+            }
+            catch { }
+
+            int cxBig = GetSystemMetrics(11 /* SM_CXICON */);
+            int cyBig = GetSystemMetrics(12 /* SM_CYICON */);
+            int cxSm = GetSystemMetrics(49 /* SM_CXSMICON */);
+            int cySm = GetSystemMetrics(50 /* SM_CYSMICON */);
+
+            // 2. Carregamento de recursos da PE (ID 32512 é o padrão do Roslyn/MSBuild para ApplicationIcon, fallback 1)
+            if (hInstance != IntPtr.Zero)
+            {
+                if (hBig == IntPtr.Zero)
+                {
+                    hBig = LoadImageW(hInstance, (IntPtr)32512, 1 /* IMAGE_ICON */, cxBig, cyBig, 0x00008000 /* LR_SHARED */);
+                    if (hBig == IntPtr.Zero)
+                        hBig = LoadImageW(hInstance, (IntPtr)1, 1, cxBig, cyBig, 0x00008000);
+                    if (hBig == IntPtr.Zero)
+                        hBig = LoadIconW(hInstance, (IntPtr)32512);
+                    if (hBig == IntPtr.Zero)
+                        hBig = LoadIconW(hInstance, (IntPtr)1);
+                }
+
+                if (hSmall == IntPtr.Zero)
+                {
+                    hSmall = LoadImageW(hInstance, (IntPtr)32512, 1 /* IMAGE_ICON */, cxSm, cySm, 0x00008000 /* LR_SHARED */);
+                    if (hSmall == IntPtr.Zero)
+                        hSmall = LoadImageW(hInstance, (IntPtr)1, 1, cxSm, cySm, 0x00008000);
+                }
+            }
+
+            // 3. Fallback em ambiente de desenvolvimento/debug (ex: dotnet run onde host é dotnet.exe)
+            if (hBig == IntPtr.Zero || hSmall == IntPtr.Zero)
+            {
+                try
+                {
+                    string[] candidates =
+                    [
+                        Path.Combine(AppContext.BaseDirectory, "assets", "KMShare.ico"),
+                        Path.Combine(AppContext.BaseDirectory, "KMShare.ico"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "assets", "KMShare.ico"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "KMShare.ico")
+                    ];
+
+                    foreach (string candidate in candidates)
+                    {
+                        if (File.Exists(candidate))
+                        {
+                            if (hBig == IntPtr.Zero)
+                                hBig = LoadImageW(IntPtr.Zero, candidate, 1, cxBig, cyBig, 0x00000010 /* LR_LOADFROMFILE */);
+                            if (hSmall == IntPtr.Zero)
+                                hSmall = LoadImageW(IntPtr.Zero, candidate, 1, cxSm, cySm, 0x00000010 /* LR_LOADFROMFILE */);
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 4. Fallback final para o ícone padrão da aplicação do Windows se nenhum for encontrado
+            if (hBig == IntPtr.Zero)
+                hBig = LoadIconW(IntPtr.Zero, (IntPtr)32512);
+            if (hSmall == IntPtr.Zero)
+                hSmall = hBig;
+
+            return (hBig, hSmall);
         }
 
         private void BuildChildControls(IntPtr hWnd)
@@ -2292,11 +2383,19 @@ public static partial class KMShareGuiWindow
         {
             try
             {
-                IntPtr hExe = GetModuleHandleW(null);
-                IntPtr hTrayIcon = LoadIconW(hExe, 1);
+                IntPtr hTrayIcon = _hAppIconSmall != IntPtr.Zero ? _hAppIconSmall : _hAppIconBig;
                 if (hTrayIcon == IntPtr.Zero)
                 {
-                    hTrayIcon = LoadIconW(IntPtr.Zero, 32512);
+                    IntPtr hExe = GetModuleHandleW(null);
+                    hTrayIcon = LoadIconW(hExe, (IntPtr)32512);
+                    if (hTrayIcon == IntPtr.Zero)
+                    {
+                        hTrayIcon = LoadIconW(hExe, (IntPtr)1);
+                    }
+                    if (hTrayIcon == IntPtr.Zero)
+                    {
+                        hTrayIcon = LoadIconW(IntPtr.Zero, (IntPtr)32512);
+                    }
                 }
                 _trayNid = new NOTIFYICONDATAW
                 {
@@ -3131,6 +3230,22 @@ public static partial class KMShareGuiWindow
         [LibraryImport("dwmapi.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static partial int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static partial uint ExtractIconExW(string lpszFile, int nIconIndex, out IntPtr phiconLarge, out IntPtr phiconSmall, uint nIcons);
+
+        [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static partial int SetCurrentProcessExplicitAppUserModelID(string appID);
+
+        [LibraryImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static partial IntPtr LoadImageW(IntPtr hInst, IntPtr uId, uint type, int cx, int cy, uint fuLoad);
+
+        [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static partial IntPtr LoadImageW(IntPtr hInst, string name, uint type, int cx, int cy, uint fuLoad);
     }
 
     private sealed class GuiLogTeeWriter(TextWriter originalOut, Action<string> onLine) : TextWriter

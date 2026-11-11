@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -487,7 +487,11 @@ public static class TrayAndEdgeManager
         public WindowsSystemTrayBadge(string tooltip)
         {
             IntPtr hExe = GetModuleHandleW(null);
-            IntPtr hIcon = LoadIconW(hExe, (IntPtr)1);
+            IntPtr hIcon = LoadIconW(hExe, (IntPtr)IDI_APPLICATION);
+            if (hIcon == IntPtr.Zero)
+            {
+                hIcon = LoadIconW(hExe, (IntPtr)1);
+            }
             if (hIcon == IntPtr.Zero)
             {
                 hIcon = LoadIconW(IntPtr.Zero, (IntPtr)IDI_APPLICATION);
