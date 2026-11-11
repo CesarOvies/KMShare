@@ -50,7 +50,5 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --gui"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-Filename: "certutil.exe"; Parameters: "-user -addstore Root ""{app}\KMShare-CodeSigning.cer"""; Flags: runhidden; StatusMsg: "Registrando certificado de assinatura confiável..."; Check: FileExists(ExpandConstant('{app}\KMShare-CodeSigning.cer'))
-Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPublisher ""{app}\KMShare-CodeSigning.cer"""; Flags: runhidden; StatusMsg: "Registrando editor confiável..."; Check: FileExists(ExpandConstant('{app}\KMShare-CodeSigning.cer'))
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; Parameters: "--gui"
 
