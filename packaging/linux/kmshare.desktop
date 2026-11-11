@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=KMShare
+GenericName=Virtual KVM & File Share
+Comment=Intranet Virtual KVM & Secure Peer-to-Peer File Transfer (.NET 10)
+Exec=kmshare --gui
+Icon=kmshare
+Terminal=false
+Categories=Utility;Network;HardwareSettings;
+Keywords=KVM;Mouse;Keyboard;Share;FileTransfer;Intranet;
+StartupNotify=true
+StartupWMClass=KMShare
+

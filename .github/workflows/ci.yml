@@ -1,0 +1,113 @@
+name: CI & PR Policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  branch-policy:
+    name: Validate PR Branch Policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Gitflow PR Target & Source Rules
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const base = pr.base.ref;
+            const head = pr.head.ref;
+
+            let errorMessage = null;
+
+            if (base === 'main' && head !== 'develop') {
+              errorMessage = `❌ **Regra de Branch Violada**: A branch \`main\` só aceita Pull Requests vindos de \`develop\` (atual: \`${head}\` -> \`${base}\`). Redirecione seu PR para \`develop\`.`;
+            } else if (base !== 'main' && base !== 'develop') {
+              errorMessage = `❌ **Regra de Branch Violada**: Pull Requests devem ser direcionados para \`develop\` (ou \`develop\` -> \`main\`). Alvo inválido: \`${base}\`.`;
+            }
+
+            if (errorMessage) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: errorMessage
+              });
+
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed'
+              });
+
+              core.setFailed(errorMessage);
+            } else {
+              core.info(`✅ Fluxo de branch válido: ${head} -> ${base}`);
+            }
+
+  build-and-test:
+    name: Build & Security Self-Test (.NET 10 Multiplatform)
+    needs: [branch-policy]
+    if: always() && (github.event_name == 'push' || needs.branch-policy.result == 'success')
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: |
+          dotnet restore KMShare.csproj
+          dotnet restore updater/KMShare.Updater/KMShare.Updater.csproj
+
+      - name: Compile Cross-Platform Single-File Targets
+        run: |
+          dotnet build KMShare.csproj -c Release
+          dotnet build KMShare.csproj -c Release -r win-x64
+          dotnet build KMShare.csproj -c Release -r linux-x64
+          dotnet build KMShare.csproj -c Release -r osx-arm64
+          dotnet build updater/KMShare.Updater/KMShare.Updater.csproj -c Release -r win-x64
+          dotnet build updater/KMShare.Updater/KMShare.Updater.csproj -c Release -r linux-x64
+          dotnet build updater/KMShare.Updater/KMShare.Updater.csproj -c Release -r osx-arm64
+
+      - name: Run KMShare Core Security & Integrity Self-Test
+        run: dotnet run --project KMShare.csproj -c Release -- --self-test
+
+      - name: Run KMShare.Updater Cryptographic Verification Self-Test
+        run: dotnet run --project updater/KMShare.Updater/KMShare.Updater.csproj -c Release -- --self-test
+
+      - name: Auto-close PR if build or security self-test fails
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const message = `❌ **PR Fechado Automaticamente**: A compilação multiplataforma (.NET 10) ou a suíte de autoteste de segurança e integridade falharam. Todos os testes precisam passar para manter o Pull Request aberto.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: message
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: 'closed'
+            });
+
