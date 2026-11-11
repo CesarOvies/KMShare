@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/Security-ECDH%20P--256%20%2B%20AES--256--GCM-10B981" alt="Security" />
   <img src="https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20System-3B82F6" alt="Themes" />
   <img src="https://img.shields.io/badge/i18n-PT%20%7C%20EN%20%7C%20ES-06B6D4" alt="i18n" />
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
   <img src="https://img.shields.io/badge/Platform-win--x64%20%7C%20linux--x64%20%7C%20osx--arm64-slate" alt="Multiplatform" />
 </p>
 
@@ -201,6 +202,7 @@ O script gera os binários `KMShare` e `kmshare-updater` prontos para distribui�
 
 ```text
 KMShare/
+├── LICENSE                                    # Licença MIT
 ├── README.md                                  # Documentação principal e guia de operação do projeto
 ├── AGENTS.md                                  # Guia de contexto, arquitetura e regras para agentes de IA
 ├── MAINTENANCE.md                             # Manual de sustentação, invariantes de SO e protocolos de rede
