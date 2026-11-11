@@ -2022,7 +2022,7 @@ public static partial class KMShareGuiWindow
                 SetButtonVariant(IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.PrimaryAction);
                 MessageBoxW(
                     _hwndMain,
-                    LocalizationManager.Format(LocKey.UpdateFailed, "Não foi possível concluir o download ou inicialização do instalador."),
+                    LocalizationManager.Format(LocKey.UpdateFailed, "Não foi possível concluir o download ou aplicação da atualização."),
                     LocalizationManager.Get(LocKey.AppTitle),
                     0x00000010 /* MB_ICONERROR */);
             }

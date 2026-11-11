@@ -85,12 +85,15 @@ O repositório adota a mesma segmentação e política estrita do projeto **GitC
    - Gera binários Single-File Self-Contained para `win-x64`, `linux-x64` e `osx-arm64`.
 2. **Matriz de Pacotes Disponíveis:**
    - **Windows (`win-x64`)**:
+     - *Executável Standalone Direto*: `KMShare-v<version>-win-x64.exe` (execução direta sem instalação)
      - *Portable*: `KMShare-v<version>-win-x64-portable.zip`
      - *Instalador*: `KMShare-v<version>-win-x64-installer.exe` (Inno Setup no escopo `asInvoker` / `PrivilegesRequired=lowest` em `%LOCALAPPDATA%\Programs\KMShare`) e script standalone `Install-KMShare.ps1`.
    - **Linux (`linux-x64`)**:
+     - *Binário Standalone Direto*: `KMShare-v<version>-linux-x64` (execução direta sem instalação)
      - *Portable*: `KMShare-v<version>-linux-x64-portable.tar.gz`
      - *Instalador*: Pacote Debian `KMShare-v<version>-linux-x64.deb` e script instalador User-Space `KMShare-v<version>-linux-x64-installer.sh`.
    - **macOS (`osx-arm64` Apple Silicon)**:
+     - *Binário Standalone Direto*: `KMShare-v<version>-osx-arm64` (execução direta sem instalação)
      - *Portable*: `KMShare-v<version>-osx-arm64-portable.tar.gz`
      - *Instalador*: Pacote App Bundle `KMShare-v<version>-osx-arm64-app.zip` (`KMShare.app` com `Info.plist`) e script standalone `KMShare-v<version>-osx-arm64-installer.sh`.
 3. **Segurança Obrigatória e Scan Microsoft Defender:**

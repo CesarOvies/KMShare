@@ -102,6 +102,11 @@ if ($PackageAll) {
         Write-Host "`n--- Empacotando Windows (win-x64) ---" -ForegroundColor Cyan
         $winPub = Join-Path $publishBase "win-x64"
 
+        # Direct Standalone Executable (.exe)
+        $winExeName = "KMShare-v$Version-win-x64.exe"
+        Copy-Item (Join-Path $winPub "KMShare.exe") (Join-Path $distBase $winExeName) -Force
+        Write-Host "  -> Executavel Standalone (.exe) criado: $winExeName" -ForegroundColor Green
+
         # Portable ZIP
         $winZipName = "KMShare-v$Version-win-x64-portable.zip"
         $winZipPath = Join-Path $distBase $winZipName
@@ -157,6 +162,11 @@ if ($PackageAll) {
         Write-Host "`n--- Empacotando Linux (linux-x64) ---" -ForegroundColor Cyan
         $linuxPub = Join-Path $publishBase "linux-x64"
 
+        # Direct Standalone Binary
+        $linuxBinName = "KMShare-v$Version-linux-x64"
+        Copy-Item (Join-Path $linuxPub "KMShare") (Join-Path $distBase $linuxBinName) -Force
+        Write-Host "  -> Executavel Standalone criado: $linuxBinName" -ForegroundColor Green
+
         # Portable TAR.GZ
         $linuxTarName = "KMShare-v$Version-linux-x64-portable.tar.gz"
         $linuxTarPath = Join-Path $distBase $linuxTarName
@@ -187,6 +197,11 @@ if ($PackageAll) {
     if ($Runtimes -contains "osx-arm64") {
         Write-Host "`n--- Empacotando macOS (osx-arm64) ---" -ForegroundColor Cyan
         $macPub = Join-Path $publishBase "osx-arm64"
+
+        # Direct Standalone Binary
+        $macBinName = "KMShare-v$Version-osx-arm64"
+        Copy-Item (Join-Path $macPub "KMShare") (Join-Path $distBase $macBinName) -Force
+        Write-Host "  -> Executavel Standalone criado: $macBinName" -ForegroundColor Green
 
         # Portable TAR.GZ
         $macTarName = "KMShare-v$Version-osx-arm64-portable.tar.gz"

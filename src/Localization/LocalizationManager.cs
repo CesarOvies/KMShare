@@ -162,7 +162,7 @@ public static class LocalizationManager
             [LocKey.UpdateAvailableDiscreet] = "v{0} disponível",
             [LocKey.UpdateUpToDate] = "KMShare está na versão mais recente (v{0}).",
             [LocKey.UpdateDownloading] = "Baixando atualização v{0}...",
-            [LocKey.UpdateDownloadComplete] = "Download concluído! Iniciando instalador...",
+            [LocKey.UpdateDownloadComplete] = "Download concluído! Aplicando atualização...",
             [LocKey.UpdateFailed] = "Falha ao verificar/baixar atualização: {0}"
         },
         [AppLanguage.English] = new()
@@ -235,7 +235,7 @@ public static class LocalizationManager
             [LocKey.UpdateAvailableDiscreet] = "v{0} available",
             [LocKey.UpdateUpToDate] = "KMShare is up to date (v{0}).",
             [LocKey.UpdateDownloading] = "Downloading update v{0}...",
-            [LocKey.UpdateDownloadComplete] = "Download complete! Launching installer...",
+            [LocKey.UpdateDownloadComplete] = "Download complete! Applying update...",
             [LocKey.UpdateFailed] = "Failed to check/download update: {0}"
         },
         [AppLanguage.Spanish] = new()
@@ -308,7 +308,7 @@ public static class LocalizationManager
             [LocKey.UpdateAvailableDiscreet] = "v{0} disponible",
             [LocKey.UpdateUpToDate] = "KMShare está actualizado (v{0}).",
             [LocKey.UpdateDownloading] = "Descargando actualización v{0}...",
-            [LocKey.UpdateDownloadComplete] = "¡Descarga completa! Iniciando instalador...",
+            [LocKey.UpdateDownloadComplete] = "¡Descarga completa! Aplicando actualización...",
             [LocKey.UpdateFailed] = "Fallo al comprobar/descargar actualización: {0}"
         }
     };
