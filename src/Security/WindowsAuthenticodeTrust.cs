@@ -1,7 +1,7 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 
-namespace MKShare.Security;
+namespace KMShare.Security;
 
 /// <summary>
 /// Gerencia a auto-verificação e instalação segura da chave pública do certificado de assinatura

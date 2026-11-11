@@ -1,11 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
 public static class VpnKillSwitchProbe
 {

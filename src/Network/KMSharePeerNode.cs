@@ -1,14 +1,14 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using MKShare.FileTransfer;
-using MKShare.Platform;
-using MKShare.Security;
+using KMShare.FileTransfer;
+using KMShare.Platform;
+using KMShare.Security;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
-public static class MKSharePeerNode
+public static class KMSharePeerNode
 {
     public const int DefaultUdpPort = 51820;
 
@@ -51,7 +51,7 @@ public static class MKSharePeerNode
         string localBtMac = BluetoothRfcommNode.GetLocalBluetoothMacAddress();
 
         Console.WriteLine("=======================================================================");
-        Console.WriteLine("[MKShare RECEIVER - Dual Stack (LAN UDP + Bluetooth RFCOMM)]");
+        Console.WriteLine("[KMShare RECEIVER - Dual Stack (LAN UDP + Bluetooth RFCOMM)]");
         Console.WriteLine($"  -> Escutando LAN Física:  {bindLanIp}:{port}");
         Console.WriteLine($"  -> Escutando Bluetooth:   {localBtMac} (Canal {BluetoothRfcommNode.DefaultRfcommChannel})");
         Console.WriteLine($"  -> Canal de Arquivos TCP: {bindLanIp}:{SecureFileChannel.DefaultTcpFilePort} (Step-Up Auth)");
@@ -216,7 +216,7 @@ public static class MKSharePeerNode
             using var session = new SecureHidSession(maxDistinctKeystrokesPerSecond: 30);
 
             Console.WriteLine("=================================================================");
-            Console.WriteLine($"[MKShare SENDER] Placa Física Local: {localBindIp} -> Destino: {targetEp}");
+            Console.WriteLine($"[KMShare SENDER] Placa Física Local: {localBindIp} -> Destino: {targetEp}");
             Console.WriteLine("Iniciando pareamento ECDH P-256 + HKDF-SHA256...");
             Console.WriteLine("=================================================================");
 
@@ -437,7 +437,7 @@ public static class MKSharePeerNode
     public static bool TryApplyModeBStepUpFirewallAndRoute(IPAddress localIp, IPAddress targetIp, int port)
     {
         if (!OsStepUpAuth.PromptUserConsent(
-                $"MKShare Modo B: Autorizar rota direta e porta UDP {port} exclusivamente para {targetIp}?"))
+                $"KMShare Modo B: Autorizar rota direta e porta UDP {port} exclusivamente para {targetIp}?"))
         {
             return false;
         }
@@ -445,7 +445,7 @@ public static class MKSharePeerNode
         try
         {
             string args = $"/c route add {targetIp} mask 255.255.255.255 {localIp} metric 1 & " +
-                          $"netsh advfirewall firewall add rule name=\"MKShare_Peer_{targetIp}\" dir=in action=allow remoteip={targetIp}/32 protocol=UDP localport={port}";
+                          $"netsh advfirewall firewall add rule name=\"KMShare_Peer_{targetIp}\" dir=in action=allow remoteip={targetIp}/32 protocol=UDP localport={port}";
             using var proc = Process.Start(new ProcessStartInfo("cmd.exe", args)
             {
                 Verb = "runas",

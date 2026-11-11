@@ -1,13 +1,13 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using MKShare.Platform;
-using MKShare.Security;
+using KMShare.Platform;
+using KMShare.Security;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
 public record BluetoothPeerDevice(string Name, string MacAddress, ulong RawAddress, bool IsConnected, bool IsAuthenticated);
 
@@ -168,7 +168,7 @@ public static class BluetoothRfcommNode
         listenSocket.Bind(CreatePlatformRfcommEndPoint(0, DefaultRfcommChannel));
         listenSocket.Listen(2);
 
-        Console.WriteLine($"[MKShare BLUETOOTH RECEIVER] Escutando em {localBtMac} (Canal RFCOMM {DefaultRfcommChannel})");
+        Console.WriteLine($"[KMShare BLUETOOTH RECEIVER] Escutando em {localBtMac} (Canal RFCOMM {DefaultRfcommChannel})");
 
         using var reg = ct.Register(() => listenSocket.Close());
 
@@ -269,7 +269,7 @@ public static class BluetoothRfcommNode
         using var socket = CreatePlatformRfcommSocket();
 
         Console.WriteLine("=======================================================================");
-        Console.WriteLine($"[MKShare BLUETOOTH SENDER - Modo C] Conectando a {targetBtMac} (Canal {DefaultRfcommChannel})...");
+        Console.WriteLine($"[KMShare BLUETOOTH SENDER - Modo C] Conectando a {targetBtMac} (Canal {DefaultRfcommChannel})...");
         Console.WriteLine("=======================================================================");
 
         socket.Connect(CreatePlatformRfcommEndPoint(btAddr, DefaultRfcommChannel));

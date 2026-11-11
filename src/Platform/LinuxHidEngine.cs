@@ -1,8 +1,8 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
-using MKShare.Security;
+using KMShare.Security;
 
-namespace MKShare.Platform;
+namespace KMShare.Platform;
 
 public sealed class LinuxHidEngine : IHidPlatform
 {

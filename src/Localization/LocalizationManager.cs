@@ -1,7 +1,7 @@
-using System.Globalization;
-using MKShare.Platform;
+﻿using System.Globalization;
+using KMShare.Platform;
 
-namespace MKShare.Localization;
+namespace KMShare.Localization;
 
 public enum AppLanguage
 {
@@ -73,7 +73,16 @@ public enum LocKey
     ThemeSystem,
     LangPt,
     LangEn,
-    LangEs
+    LangEs,
+    CheckUpdatesButton,
+    CheckingUpdates,
+    UpdateAvailablePromptTitle,
+    UpdateAvailablePromptMsg,
+    UpdateAvailableDiscreet,
+    UpdateUpToDate,
+    UpdateDownloading,
+    UpdateDownloadComplete,
+    UpdateFailed
 }
 
 public static class LocalizationManager
@@ -86,7 +95,7 @@ public static class LocalizationManager
         [AppLanguage.Portuguese] = new()
         {
             [LocKey.AppTitle] = "KMShare — Central de Conexão Multi-Dispositivo",
-            [LocKey.HeaderSubtitle] = "LAN Física: {0}   •   Bluetooth Local: {1}   •   Criptografia: ECDH P-256 + AES-256-GCM (Zero-Admin)",
+            [LocKey.HeaderSubtitle] = "Versão: v{0}   •   LAN Física: {1}   •   Bluetooth: {2}   •   Zero-Admin",
             [LocKey.CardRoleTitle] = "1. Modo de Operação deste Dispositivo (Selecione em cada computador)",
             [LocKey.RoleSenderButton] = "Controlador (Principal) — Enviar Mouse e Teclado",
             [LocKey.RoleReceiverButton] = "Receptor (Secundário) — Receber Controle neste PC",
@@ -145,12 +154,21 @@ public static class LocalizationManager
             [LocKey.ThemeSystem] = "Sistema",
             [LocKey.LangPt] = "Português",
             [LocKey.LangEn] = "Inglês",
-            [LocKey.LangEs] = "Espanhol"
+            [LocKey.LangEs] = "Espanhol",
+            [LocKey.CheckUpdatesButton] = "Atualizações",
+            [LocKey.CheckingUpdates] = "Verificando...",
+            [LocKey.UpdateAvailablePromptTitle] = "KMShare — Nova Versão Disponível",
+            [LocKey.UpdateAvailablePromptMsg] = "Uma nova versão do KMShare está disponível no GitHub!\n\nVersão atual: v{0}\nNova versão: v{1}\n\nDeseja baixar e atualizar agora?",
+            [LocKey.UpdateAvailableDiscreet] = "v{0} disponível",
+            [LocKey.UpdateUpToDate] = "KMShare está na versão mais recente (v{0}).",
+            [LocKey.UpdateDownloading] = "Baixando atualização v{0}...",
+            [LocKey.UpdateDownloadComplete] = "Download concluído! Iniciando instalador...",
+            [LocKey.UpdateFailed] = "Falha ao verificar/baixar atualização: {0}"
         },
         [AppLanguage.English] = new()
         {
             [LocKey.AppTitle] = "KMShare — Multi-Device Control Center",
-            [LocKey.HeaderSubtitle] = "Physical LAN: {0}   •   Local Bluetooth: {1}   •   Encryption: ECDH P-256 + AES-256-GCM (Zero-Admin)",
+            [LocKey.HeaderSubtitle] = "Version: v{0}   •   Physical LAN: {1}   •   Bluetooth: {2}   •   Zero-Admin",
             [LocKey.CardRoleTitle] = "1. Device Operation Mode (Select on each computer)",
             [LocKey.RoleSenderButton] = "Controller (Primary) — Send Mouse & Keyboard",
             [LocKey.RoleReceiverButton] = "Receiver (Secondary) — Receive Control on this PC",
@@ -209,12 +227,21 @@ public static class LocalizationManager
             [LocKey.ThemeSystem] = "System",
             [LocKey.LangPt] = "Portuguese",
             [LocKey.LangEn] = "English",
-            [LocKey.LangEs] = "Spanish"
+            [LocKey.LangEs] = "Spanish",
+            [LocKey.CheckUpdatesButton] = "Updates",
+            [LocKey.CheckingUpdates] = "Checking...",
+            [LocKey.UpdateAvailablePromptTitle] = "KMShare — New Version Available",
+            [LocKey.UpdateAvailablePromptMsg] = "A new version of KMShare is available on GitHub!\n\nCurrent version: v{0}\nNew version: v{1}\n\nDo you want to download and update now?",
+            [LocKey.UpdateAvailableDiscreet] = "v{0} available",
+            [LocKey.UpdateUpToDate] = "KMShare is up to date (v{0}).",
+            [LocKey.UpdateDownloading] = "Downloading update v{0}...",
+            [LocKey.UpdateDownloadComplete] = "Download complete! Launching installer...",
+            [LocKey.UpdateFailed] = "Failed to check/download update: {0}"
         },
         [AppLanguage.Spanish] = new()
         {
             [LocKey.AppTitle] = "KMShare — Centro de Conexión Multi-Dispositivo",
-            [LocKey.HeaderSubtitle] = "LAN Física: {0}   •   Bluetooth Local: {1}   •   Cifrado: ECDH P-256 + AES-256-GCM (Zero-Admin)",
+            [LocKey.HeaderSubtitle] = "Versión: v{0}   •   LAN Física: {1}   •   Bluetooth: {2}   •   Zero-Admin",
             [LocKey.CardRoleTitle] = "1. Modo de Operación de este Dispositivo (Seleccione en cada PC)",
             [LocKey.RoleSenderButton] = "Controlador (Principal) — Enviar Ratón y Teclado",
             [LocKey.RoleReceiverButton] = "Receptor (Secundario) — Recibir Control en este PC",
@@ -273,7 +300,16 @@ public static class LocalizationManager
             [LocKey.ThemeSystem] = "Sistema",
             [LocKey.LangPt] = "Portugués",
             [LocKey.LangEn] = "Inglés",
-            [LocKey.LangEs] = "Español"
+            [LocKey.LangEs] = "Español",
+            [LocKey.CheckUpdatesButton] = "Actualizaciones",
+            [LocKey.CheckingUpdates] = "Comprobando...",
+            [LocKey.UpdateAvailablePromptTitle] = "KMShare — Nueva Versión Disponible",
+            [LocKey.UpdateAvailablePromptMsg] = "¡Una nueva versión de KMShare está disponible en GitHub!\n\nVersión actual: v{0}\nNueva versión: v{1}\n\n¿Desea descargar y actualizar ahora?",
+            [LocKey.UpdateAvailableDiscreet] = "v{0} disponible",
+            [LocKey.UpdateUpToDate] = "KMShare está actualizado (v{0}).",
+            [LocKey.UpdateDownloading] = "Descargando actualización v{0}...",
+            [LocKey.UpdateDownloadComplete] = "¡Descarga completa! Iniciando instalador...",
+            [LocKey.UpdateFailed] = "Fallo al comprobar/descargar actualización: {0}"
         }
     };
 

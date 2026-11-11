@@ -1,17 +1,18 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KMShare;
-using MKShare.FileTransfer;
-using MKShare.Network;
-using MKShare.Localization;
-using MKShare.Platform;
-using MKShare.Security;
+using KMShare.FileTransfer;
+using KMShare.Network;
+using KMShare.Localization;
+using KMShare.Platform;
+using KMShare.Security;
 
-namespace MKShare.UI;
+namespace KMShare.UI;
 
 public static partial class KMShareGuiWindow
 {
@@ -186,6 +187,7 @@ public static partial class KMShareGuiWindow
         private const int IDC_BTN_THEME_LIGHT = 711;
         private const int IDC_BTN_THEME_DARK = 712;
         private const int IDC_BTN_THEME_SYSTEM = 713;
+        private const int IDC_BTN_CHECK_UPDATE = 721;
 
         // Modern Dynamic Color Palette
         private static uint Rgb(byte r, byte g, byte b) => (uint)(r | (g << 8) | (b << 16));
@@ -296,6 +298,9 @@ public static partial class KMShareGuiWindow
         private IntPtr _btnThemeLight;
         private IntPtr _btnThemeDark;
         private IntPtr _btnThemeSystem;
+        private IntPtr _btnCheckUpdate;
+        private UpdateCheckResult? _lastUpdateCheckResult;
+        private bool _isCheckingUpdates;
         private IntPtr _txtLog;
 
         private NOTIFYICONDATAW _trayNid;
@@ -323,8 +328,8 @@ public static partial class KMShareGuiWindow
             _logTeeWriter = new GuiLogTeeWriter(_originalConsoleOut, AppendLogLineThreadSafe);
             Console.SetOut(_logTeeWriter);
 
-            MKSharePeerNode.CustomVpnFallbackPrompt = PromptVpnFallbackDialog;
-            MKSharePeerNode.CustomBluetoothTargetSelector = GetSelectedBluetoothTarget;
+            KMSharePeerNode.CustomVpnFallbackPrompt = PromptVpnFallbackDialog;
+            KMSharePeerNode.CustomBluetoothTargetSelector = GetSelectedBluetoothTarget;
         }
 
         private int S(int px) => (int)Math.Round(px * _dpiScale);
@@ -388,7 +393,7 @@ public static partial class KMShareGuiWindow
             _hwndMain = CreateWindowExW(
                 0,
                 WindowClassName,
-                $"{LocalizationManager.Get(LocKey.AppTitle)} ({Environment.MachineName})",
+                $"{LocalizationManager.Get(LocKey.AppTitle)} v{AppVersionInfo.CurrentVersion} ({Environment.MachineName})",
                 WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                 posX, posY, winW, winH,
                 IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
@@ -444,6 +449,12 @@ public static partial class KMShareGuiWindow
                 });
             }
 
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1200);
+                await CheckForUpdatesStartupAsync();
+            });
+
             try
             {
                 while (GetMessageW(out MSG msg, IntPtr.Zero, 0, 0) > 0)
@@ -483,6 +494,7 @@ public static partial class KMShareGuiWindow
             _btnThemeLight = CreateOwnerDrawButton(hWnd, "☀️ " + LocalizationManager.Get(LocKey.ThemeLight), IDC_BTN_THEME_LIGHT, ButtonStyleVariant.SegmentToggle);
             _btnThemeDark = CreateOwnerDrawButton(hWnd, "🌙 " + LocalizationManager.Get(LocKey.ThemeDark), IDC_BTN_THEME_DARK, ButtonStyleVariant.SegmentToggle);
             _btnThemeSystem = CreateOwnerDrawButton(hWnd, "💻 " + LocalizationManager.Get(LocKey.ThemeSystem), IDC_BTN_THEME_SYSTEM, ButtonStyleVariant.SegmentToggle);
+            _btnCheckUpdate = CreateOwnerDrawButton(hWnd, "🔍 " + LocalizationManager.Get(LocKey.CheckUpdatesButton), IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.SecondaryOutline);
 
             // Card 1 Controls: Role Segmented Buttons, NIC Combo, PIN, Autostart
             _btnRoleSender = CreateOwnerDrawButton(hWnd,
@@ -582,7 +594,7 @@ public static partial class KMShareGuiWindow
                 LayoutControls(_clientWidth, _clientHeight);
             }
 
-            AppendLogLine($"[KMShare] Interface inicializada em User-Space (Sem Admin) — Máquina: {Environment.MachineName} | LAN: {_localLanIp} | BT: {_localBtMac}");
+            AppendLogLine($"[KMShare v{AppVersionInfo.CurrentVersion}] Interface inicializada em User-Space (Sem Admin) — Máquina: {Environment.MachineName} | LAN: {_localLanIp} | BT: {_localBtMac}");
             AppendLogLine("[Guia Rápido] No PC secundário, selecione 'Receptor (Secundário)' e clique em 'Iniciar Modo Receptor'. No PC principal, selecione 'Controlador', escolha o dispositivo na tabela e clique em 'Conectar'.");
         }
 
@@ -629,7 +641,7 @@ public static partial class KMShareGuiWindow
 
             _rcCardLog = new RECT { left = margin, top = y, right = margin + contentW, bottom = Math.Max(y + cardLogH, height - margin) };
 
-            IntPtr hdwp = BeginDeferWindowPos(30);
+            IntPtr hdwp = BeginDeferWindowPos(32);
             int pad = S(14);
 
             // --- Position Header Controls (top right) ---
@@ -649,6 +661,10 @@ public static partial class KMShareGuiWindow
             DeferControl(ref hdwp, _btnLangPt, lX, btnY, langW, btnH);
             DeferControl(ref hdwp, _btnLangEn, lX + langW + sGap, btnY, langW, btnH);
             DeferControl(ref hdwp, _btnLangEs, lX + (langW + sGap) * 2, btnY, langW, btnH);
+
+            int updateBtnW = S(150);
+            int updateBtnX = lX - S(10) - updateBtnW;
+            DeferControl(ref hdwp, _btnCheckUpdate, updateBtnX, btnY, updateBtnW, btnH);
 
             // --- Position Card 1 Controls ---
             int r1Y = _rcCardRole.top + S(30);
@@ -796,10 +812,10 @@ public static partial class KMShareGuiWindow
                 // 2. Top Header Banner
                 FillSolidRect(memDc, _rcHeader, ColHeaderBg);
                 DrawTextLine(memDc, _fontHeaderTitle, _currentPalette.ColHeaderTitle,
-                    $"{LocalizationManager.Get(LocKey.AppTitle)} ({Environment.MachineName})",
+                    $"{LocalizationManager.Get(LocKey.AppTitle)} v{AppVersionInfo.CurrentVersion} ({Environment.MachineName})",
                     S(16), S(10));
                 DrawTextLine(memDc, _fontHeaderSub, _currentPalette.ColHeaderSub,
-                    LocalizationManager.Format(LocKey.HeaderSubtitle, _localLanIp, _localBtMac),
+                    LocalizationManager.Format(LocKey.HeaderSubtitle, AppVersionInfo.CurrentVersion, _localLanIp, _localBtMac),
                     S(16), S(38));
 
                 // Status Pill in top-right of Header
@@ -966,7 +982,7 @@ public static partial class KMShareGuiWindow
             bool isDisabled = (dis.itemState & 0x0004 /* ODS_DISABLED */) != 0;
 
             // Clear button background with container color so rounded corners look clean
-            uint bgClearCol = (btn.Id is >= 701 and <= 713) ? ColHeaderBg : ColCardBg;
+            uint bgClearCol = (btn.Id is >= 701 and <= 725) ? ColHeaderBg : ColCardBg;
             FillSolidRect(hdc, rc, bgClearCol);
 
             uint fillCol;
@@ -1109,6 +1125,15 @@ public static partial class KMShareGuiWindow
             }
         }
 
+        private void SetButtonVariant(int id, ButtonStyleVariant variant)
+        {
+            if (_buttonsById.TryGetValue(id, out var st))
+            {
+                st.Variant = variant;
+                InvalidateRect(st.Hwnd, IntPtr.Zero, false);
+            }
+        }
+
         private void PopulateConnModesCombo()
         {
             if (_cmbConnMode == IntPtr.Zero) return;
@@ -1189,6 +1214,15 @@ public static partial class KMShareGuiWindow
             SetButtonLabel(IDC_BTN_THEME_DARK, "🌙 " + LocalizationManager.Get(LocKey.ThemeDark));
             SetButtonLabel(IDC_BTN_THEME_SYSTEM, "💻 " + LocalizationManager.Get(LocKey.ThemeSystem));
 
+            if (_lastUpdateCheckResult != null && _lastUpdateCheckResult.HasUpdate)
+            {
+                SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⚡ " + LocalizationManager.Format(LocKey.UpdateAvailableDiscreet, _lastUpdateCheckResult.LatestVersion));
+            }
+            else
+            {
+                SetButtonLabel(IDC_BTN_CHECK_UPDATE, "🔍 " + LocalizationManager.Get(LocKey.CheckUpdatesButton));
+            }
+
             if (_chkAutostart != IntPtr.Zero)
             {
                 SetWindowTextW(_chkAutostart, LocalizationManager.Get(LocKey.AutostartCheckbox));
@@ -1209,7 +1243,7 @@ public static partial class KMShareGuiWindow
 
             if (_hwndMain != IntPtr.Zero)
             {
-                SetWindowTextW(_hwndMain, $"{LocalizationManager.Get(LocKey.AppTitle)} ({Environment.MachineName})");
+                SetWindowTextW(_hwndMain, $"{LocalizationManager.Get(LocKey.AppTitle)} v{AppVersionInfo.CurrentVersion} ({Environment.MachineName})");
             }
         }
 
@@ -1455,12 +1489,12 @@ public static partial class KMShareGuiWindow
 
             if (_config.DeviceRole == DeviceOperationRole.ReceiverControlled)
             {
-                AppendLogLine($"[Operação] Iniciando MODO RECEPTOR em {localIp}:{MKSharePeerNode.DefaultUdpPort} + Bluetooth ({_localBtMac}) + Arquivos (:{SecureFileChannel.DefaultTcpFilePort})...");
+                AppendLogLine($"[Operação] Iniciando MODO RECEPTOR em {localIp}:{KMSharePeerNode.DefaultUdpPort} + Bluetooth ({_localBtMac}) + Arquivos (:{SecureFileChannel.DefaultTcpFilePort})...");
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await MKSharePeerNode.RunReceiverAsync(localIp, MKSharePeerNode.DefaultUdpPort, pin, sessionToken);
+                        await KMSharePeerNode.RunReceiverAsync(localIp, KMSharePeerNode.DefaultUdpPort, pin, sessionToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -1523,22 +1557,22 @@ public static partial class KMShareGuiWindow
                         return;
                     }
 
-                    IntranetGuard.EnforceLanEndpoint(new IPEndPoint(targetIp, MKSharePeerNode.DefaultUdpPort));
+                    IntranetGuard.EnforceLanEndpoint(new IPEndPoint(targetIp, KMSharePeerNode.DefaultUdpPort));
 
                     if (connModeIdx == 2)
                     {
                         AppendLogLineThreadSafe($"[Modo B] Solicitando autorização Step-Up para rota /32 e firewall UDP para {targetIp}...");
-                        bool okB = MKSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, MKSharePeerNode.DefaultUdpPort);
+                        bool okB = KMSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, KMSharePeerNode.DefaultUdpPort);
                         AppendLogLineThreadSafe(okB
                             ? $"[Modo B] Exceção /32 aplicada para {targetIp}!"
                             : "[Modo B] Elevação não aplicada; tentando conexão LAN...");
                     }
 
-                    AppendLogLineThreadSafe($"[Operação] Conectando como CONTROLADOR via LAN ({localIp} -> {targetIp}:{MKSharePeerNode.DefaultUdpPort})...");
-                    await MKSharePeerNode.RunSenderAsync(
+                    AppendLogLineThreadSafe($"[Operação] Conectando como CONTROLADOR via LAN ({localIp} -> {targetIp}:{KMSharePeerNode.DefaultUdpPort})...");
+                    await KMSharePeerNode.RunSenderAsync(
                         localIp,
                         targetIp,
-                        MKSharePeerNode.DefaultUdpPort,
+                        KMSharePeerNode.DefaultUdpPort,
                         pin,
                         sessionToken,
                         autoReconnectOnNetworkLoss: true);
@@ -1598,7 +1632,7 @@ public static partial class KMShareGuiWindow
                 {
                     string btMac = GetControlText(_txtTargetBtMac).Trim();
                     string msg =
-                        $"Não houve resposta UDP de {targetIp}:{MKSharePeerNode.DefaultUdpPort}.\n\n" +
+                        $"Não houve resposta UDP de {targetIp}:{KMSharePeerNode.DefaultUdpPort}.\n\n" +
                         "Causas comuns:\n" +
                         "  1. O outro computador ainda não iniciou o 'Modo Receptor'.\n" +
                         "  2. Uma VPN com Kill-Switch está bloqueando a Camada 3.\n\n" +
@@ -1741,7 +1775,7 @@ public static partial class KMShareGuiWindow
                     return;
                 }
 
-                bool ok = MKSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, MKSharePeerNode.DefaultUdpPort);
+                bool ok = KMSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, KMSharePeerNode.DefaultUdpPort);
                 AppendLogLineThreadSafe(ok
                     ? $"[Modo B] Rota /32 e regra de Firewall para {targetIp} aplicadas com sucesso!"
                     : "[Modo B] Operação cancelada pelo usuário ou não aplicada.");
@@ -1763,6 +1797,144 @@ public static partial class KMShareGuiWindow
                 $"• PIN de Pareamento: {_config.PairingPin}",
                 "KMShare — Dados Locais Copiados",
                 0x00000040);
+        }
+
+        private async Task CheckForUpdatesStartupAsync()
+        {
+            try
+            {
+                var result = await GitHubUpdateService.CheckForUpdatesAsync(_config, _appCt);
+                if (result.HasUpdate)
+                {
+                    InvokeOnUi(() =>
+                    {
+                        _lastUpdateCheckResult = result;
+                        SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⚡ " + LocalizationManager.Format(LocKey.UpdateAvailableDiscreet, result.LatestVersion));
+                        SetButtonVariant(IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.PrimaryAction);
+
+                        string title = LocalizationManager.Get(LocKey.UpdateAvailablePromptTitle);
+                        string msg = LocalizationManager.Format(LocKey.UpdateAvailablePromptMsg, AppVersionInfo.CurrentVersion, result.LatestVersion);
+
+                        int choice = MessageBoxW(
+                            _hwndMain,
+                            msg,
+                            title,
+                            0x00000004 /* MB_YESNO */ | 0x00000040 /* MB_ICONINFORMATION */ | 0x00010000 /* MB_SETFOREGROUND */);
+
+                        if (choice == 6 /* IDYES */)
+                        {
+                            _ = TriggerUpdateDownloadAsync(result);
+                        }
+                        else
+                        {
+                            AppendLogLine($"[Atualização] Nova versão v{result.LatestVersion} disponível no GitHub. Clique em '⚡ v{result.LatestVersion}' no topo para atualizar a qualquer momento.");
+                        }
+                    });
+                }
+                else
+                {
+                    AppendLogLine($"[Atualização] KMShare está na versão mais recente (v{AppVersionInfo.CurrentVersion}).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UpdateStartup] {ex.Message}");
+            }
+        }
+
+        private async Task HandleUpdateActionAsync()
+        {
+            if (_isCheckingUpdates) return;
+
+            if (_lastUpdateCheckResult != null && _lastUpdateCheckResult.HasUpdate)
+            {
+                string title = LocalizationManager.Get(LocKey.UpdateAvailablePromptTitle);
+                string msg = LocalizationManager.Format(LocKey.UpdateAvailablePromptMsg, AppVersionInfo.CurrentVersion, _lastUpdateCheckResult.LatestVersion);
+
+                int choice = MessageBoxW(
+                    _hwndMain,
+                    msg,
+                    title,
+                    0x00000004 /* MB_YESNO */ | 0x00000040 /* MB_ICONINFORMATION */ | 0x00010000 /* MB_SETFOREGROUND */);
+
+                if (choice == 6 /* IDYES */)
+                {
+                    await TriggerUpdateDownloadAsync(_lastUpdateCheckResult);
+                }
+                return;
+            }
+
+            _isCheckingUpdates = true;
+            SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⏳ " + LocalizationManager.Get(LocKey.CheckingUpdates));
+            AppendLogLine("[Atualização] Verificando versão mais recente no GitHub...");
+
+            try
+            {
+                var result = await GitHubUpdateService.CheckForUpdatesAsync(_config, _appCt);
+                if (result.HasUpdate)
+                {
+                    _lastUpdateCheckResult = result;
+                    SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⚡ " + LocalizationManager.Format(LocKey.UpdateAvailableDiscreet, result.LatestVersion));
+                    SetButtonVariant(IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.PrimaryAction);
+
+                    string title = LocalizationManager.Get(LocKey.UpdateAvailablePromptTitle);
+                    string msg = LocalizationManager.Format(LocKey.UpdateAvailablePromptMsg, AppVersionInfo.CurrentVersion, result.LatestVersion);
+
+                    int choice = MessageBoxW(
+                        _hwndMain,
+                        msg,
+                        title,
+                        0x00000004 /* MB_YESNO */ | 0x00000040 /* MB_ICONINFORMATION */ | 0x00010000 /* MB_SETFOREGROUND */);
+
+                    if (choice == 6 /* IDYES */)
+                    {
+                        await TriggerUpdateDownloadAsync(result);
+                    }
+                    else
+                    {
+                        AppendLogLine($"[Atualização] Nova versão v{result.LatestVersion} disponível no GitHub. Clique em '⚡ v{result.LatestVersion}' no topo para atualizar.");
+                    }
+                }
+                else
+                {
+                    SetButtonLabel(IDC_BTN_CHECK_UPDATE, "🔍 " + LocalizationManager.Get(LocKey.CheckUpdatesButton));
+                    SetButtonVariant(IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.SecondaryOutline);
+                    AppendLogLine($"[Atualização] KMShare está na versão mais recente (v{AppVersionInfo.CurrentVersion}).");
+                    MessageBoxW(_hwndMain, LocalizationManager.Format(LocKey.UpdateUpToDate, AppVersionInfo.CurrentVersion), LocalizationManager.Get(LocKey.AppTitle), 0x00000040 /* MB_ICONINFORMATION */);
+                }
+            }
+            catch (Exception ex)
+            {
+                SetButtonLabel(IDC_BTN_CHECK_UPDATE, "🔍 " + LocalizationManager.Get(LocKey.CheckUpdatesButton));
+                AppendLogLine($"[Atualização] Falha ao verificar: {ex.Message}");
+            }
+            finally
+            {
+                _isCheckingUpdates = false;
+            }
+        }
+
+        private async Task TriggerUpdateDownloadAsync(UpdateCheckResult result)
+        {
+            SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⏳ " + LocalizationManager.Get(LocKey.CheckingUpdates));
+            AppendLogLine($"[Atualização] Iniciando download da versão v{result.LatestVersion}...");
+
+            bool success = await GitHubUpdateService.DownloadAndApplyUpdateAsync(
+                result,
+                _config,
+                msg => AppendLogLine($"[Atualização] {msg}"),
+                _appCt);
+
+            if (!success)
+            {
+                SetButtonLabel(IDC_BTN_CHECK_UPDATE, "⚡ " + LocalizationManager.Format(LocKey.UpdateAvailableDiscreet, result.LatestVersion));
+                SetButtonVariant(IDC_BTN_CHECK_UPDATE, ButtonStyleVariant.PrimaryAction);
+                MessageBoxW(
+                    _hwndMain,
+                    LocalizationManager.Format(LocKey.UpdateFailed, "Não foi possível concluir o download ou inicialização do instalador."),
+                    LocalizationManager.Get(LocKey.AppTitle),
+                    0x00000010 /* MB_ICONERROR */);
+            }
         }
 
         private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
@@ -2073,6 +2245,10 @@ public static partial class KMShareGuiWindow
                     ApplyTheme(AppTheme.System);
                     AppendLogLine("[Tema] Modo Automático do Sistema ativado.");
                     break;
+
+                case IDC_BTN_CHECK_UPDATE:
+                    _ = HandleUpdateActionAsync();
+                    break;
             }
         }
 
@@ -2131,7 +2307,7 @@ public static partial class KMShareGuiWindow
                     uCallbackMessage = WM_APP_TRAYICON,
                     hIcon = hTrayIcon
                 };
-                SetTrayTip(ref _trayNid, $"KMShare | {_localLanIp} | Borda:{_config.MonitorEdge} | PIN:{_config.PairingPin}");
+                SetTrayTip(ref _trayNid, $"KMShare v{AppVersionInfo.CurrentVersion} | {_localLanIp} | Borda:{_config.MonitorEdge} | PIN:{_config.PairingPin}");
                 _trayAdded = Shell_NotifyIconW(0x00000000, ref _trayNid);
             }
             catch
@@ -2144,7 +2320,7 @@ public static partial class KMShareGuiWindow
             if (!_trayAdded) return;
             try
             {
-                SetTrayTip(ref _trayNid, $"KMShare | {_localLanIp} | Borda:{_config.MonitorEdge} | PIN:{_config.PairingPin}");
+                SetTrayTip(ref _trayNid, $"KMShare v{AppVersionInfo.CurrentVersion} | {_localLanIp} | Borda:{_config.MonitorEdge} | PIN:{_config.PairingPin}");
                 Shell_NotifyIconW(0x00000001, ref _trayNid);
             }
             catch
@@ -2179,8 +2355,8 @@ public static partial class KMShareGuiWindow
             _activeSessionCts?.Dispose();
             RemoveSystemTrayIcon();
 
-            MKSharePeerNode.CustomVpnFallbackPrompt = null;
-            MKSharePeerNode.CustomBluetoothTargetSelector = null;
+            KMSharePeerNode.CustomVpnFallbackPrompt = null;
+            KMSharePeerNode.CustomBluetoothTargetSelector = null;
             Console.SetOut(_originalConsoleOut);
             _logTeeWriter.Dispose();
 

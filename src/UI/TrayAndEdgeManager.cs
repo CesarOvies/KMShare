@@ -1,14 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using MKShare.FileTransfer;
-using MKShare.Localization;
-using MKShare.Network;
-using MKShare.Platform;
+using KMShare.FileTransfer;
+using KMShare.Localization;
+using KMShare.Network;
+using KMShare.Platform;
 
-namespace MKShare.UI;
+namespace KMShare.UI;
 
 public enum DeviceOperationRole
 {
@@ -25,7 +25,8 @@ public sealed record KMShareUserConfig(
     string LastTargetIp = "",
     string LastTargetBtMac = "",
     AppLanguage Language = AppLanguage.Auto,
-    AppTheme Theme = AppTheme.System)
+    AppTheme Theme = AppTheme.System,
+    string? GitHubToken = null)
 {
     public static KMShareUserConfig CreateDefault() => new(
         MonitorEdge: ScreenEdge.Right,
@@ -36,7 +37,8 @@ public sealed record KMShareUserConfig(
         LastTargetIp: "",
         LastTargetBtMac: "",
         Language: AppLanguage.Auto,
-        Theme: AppTheme.System);
+        Theme: AppTheme.System,
+        GitHubToken: null);
 }
 
 public static class TrayAndEdgeManager
@@ -98,7 +100,7 @@ public static class TrayAndEdgeManager
 
         return $"""
             =======================================================================
-            [KMShare — Painel de Controle & Bandeja do Sistema (100% User-Space)]
+            [KMShare v{AppVersionInfo.CurrentVersion} — Painel de Controle & Bandeja do Sistema (100% User-Space)]
               Status de Transporte:   {transportLabel}
               Borda Ativa do Monitor: {config.MonitorEdge} (Cruza p/ {EdgeCoordinateMapper.GetOppositeEdge(config.MonitorEdge)} no Peer)
               Modo VPN Preferido:     {config.PreferredVpnMode}
@@ -271,7 +273,7 @@ public static class TrayAndEdgeManager
                 }
                 case "1":
                 {
-                    await MKSharePeerNode.RunReceiverAsync(localLanIp, MKSharePeerNode.DefaultUdpPort, config.PairingPin, ct);
+                    await KMSharePeerNode.RunReceiverAsync(localLanIp, KMSharePeerNode.DefaultUdpPort, config.PairingPin, ct);
                     break;
                 }
                 case "2":
@@ -283,7 +285,7 @@ public static class TrayAndEdgeManager
                     string activePin = string.IsNullOrWhiteSpace(pinInput) ? config.PairingPin : pinInput;
                     if (IPAddress.TryParse(ipStr, out IPAddress? targetIp))
                     {
-                        await MKSharePeerNode.RunSenderAsync(localLanIp, targetIp, MKSharePeerNode.DefaultUdpPort, activePin, ct);
+                        await KMSharePeerNode.RunSenderAsync(localLanIp, targetIp, KMSharePeerNode.DefaultUdpPort, activePin, ct);
                     }
                     break;
                 }
@@ -379,7 +381,7 @@ public static class TrayAndEdgeManager
         try
         {
             return new WindowsSystemTrayBadge(
-                $"KMShare | Edge:{config.MonitorEdge} | PIN:{config.PairingPin} | [F12] Emergência");
+                $"KMShare v{AppVersionInfo.CurrentVersion} | Edge:{config.MonitorEdge} | PIN:{config.PairingPin} | [F12] Emergência");
         }
         catch
         {

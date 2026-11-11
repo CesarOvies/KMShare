@@ -1,10 +1,10 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using MKShare.Security;
+using KMShare.Security;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
 public enum VpnFallbackStrategy
 {
@@ -71,12 +71,12 @@ public static class VpnFallbackOrchestrator
         bool interactivePrompt)
     {
         bool authorized = !interactivePrompt || OsStepUpAuth.PromptUserConsent(
-            $"MKShare: Autorizar exceção local na LAN para o computador {targetIp} (MAC {targetMac}) durante a VPN?");
+            $"KMShare: Autorizar exceção local na LAN para o computador {targetIp} (MAC {targetMac}) durante a VPN?");
 
         // Exact host route + high-priority WFP filter command scoped strictly to the single verified peer IP /32
         string routeAndFirewallCmd =
             $"route add {targetIp} mask 255.255.255.255 {localIp} metric 1 && " +
-            $"netsh advfirewall firewall add rule name=\"MKShare_Peer_{targetIp}\" dir=in action=allow remoteip={targetIp}/32 protocol=UDP localport=51820";
+            $"netsh advfirewall firewall add rule name=\"KMShare_Peer_{targetIp}\" dir=in action=allow remoteip={targetIp}/32 protocol=UDP localport=51820";
 
         string summary = authorized
             ? $"[Modo B - Elevação Pontual Autorizada] Regra estrita /32 preparada para {targetIp} (MAC {targetMac}): `{routeAndFirewallCmd}`. Mantém velocidade total da LAN (1000Hz / ~1Gbps)."
