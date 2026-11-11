@@ -85,6 +85,8 @@ jobs:
         id: package
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          CERT_BASE64: ${{ secrets[env.SECRET_CERT_BASE64] }}
+          CERT_PASS: ${{ secrets[env.SECRET_CERT_PASS] }}
         shell: pwsh
         run: |
           & .\build-all.ps1 `
