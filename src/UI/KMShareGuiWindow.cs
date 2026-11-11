@@ -91,6 +91,7 @@ public static partial class KMShareGuiWindow
         private const uint WM_CTLCOLORSTATIC = 0x0138;
         private const uint WM_MOUSEMOVE = 0x0200;
         private const uint WM_MOUSELEAVE = 0x02A3;
+        private const uint WM_NCDESTROY = 0x0082;
         private const uint WM_SETTINGCHANGE = 0x001A;
         private const uint WM_THEMECHANGED = 0x031A;
         private const uint WM_APP_UI_DISPATCH = 0x8001;
@@ -119,11 +120,14 @@ public static partial class KMShareGuiWindow
         private const int LVS_SHOWSELALWAYS = 0x0008;
         private const uint LVM_SETEXTENDEDLISTVIEWSTYLE = 0x1036;
         private const uint LVM_INSERTCOLUMNW = 0x1061;
+        private const uint LVM_SETCOLUMNW = 0x1060;
         private const uint LVM_INSERTITEMW = 0x104D;
         private const uint LVM_SETITEMW = 0x104C;
         private const uint LVM_DELETEALLITEMS = 0x1009;
         private const uint LVM_GETNEXTITEM = 0x100C;
         private const uint LVM_SETCOLUMNWIDTH = 0x101E;
+        private const uint LVM_GETHEADER = 0x101F;
+        private const uint CCM_SETUNICODEFORMAT = 0x2005;
         private const int LVNI_SELECTED = 0x0002;
         private const uint LVS_EX_FULLROWSELECT = 0x00000020;
         private const uint LVS_EX_GRIDLINES = 0x00000001;
@@ -209,7 +213,8 @@ public static partial class KMShareGuiWindow
 
         private readonly ConcurrentQueue<Action> _uiDispatchQueue = new();
         private readonly Dictionary<int, OwnerDrawButtonState> _buttonsById = [];
-        private readonly Dictionary<IntPtr, SubclassProcDelegate> _buttonSubclasses = [];
+        private static readonly ConcurrentDictionary<IntPtr, OwnerDrawButtonState> s_buttonStates = new();
+        private static readonly SubclassProcDelegate s_buttonSubclassProc = StaticButtonSubclassProc;
         private readonly WndProcDelegate _wndProcDelegate;
         private readonly CancellationToken _appCt;
         private readonly CancellationTokenSource _discoveryResponderCts;
@@ -227,7 +232,7 @@ public static partial class KMShareGuiWindow
         private bool _isSessionRunning;
         private bool _isRemoteControllingNow;
         private bool _isScanning;
-        private string _scanSummaryText = "Clique em 'Buscar na Rede' para descobrir computadores via LAN / ARP L2 e Bluetooth.";
+        private string _scanSummaryText = "";
 
         private double _dpiScale = 1.0;
         private int _clientWidth = 1020;
@@ -309,6 +314,7 @@ public static partial class KMShareGuiWindow
             _appCt = appCt;
             _config = TrayAndEdgeManager.LoadOrCreateConfig();
             LocalizationManager.SetLanguage(_config.Language);
+            _scanSummaryText = LocalizationManager.Get(LocKey.ScanSummaryInitial);
             _currentPalette = ThemePalette.Resolve(_config.Theme);
             _wndProcDelegate = WndProc;
             _discoveryResponderCts = CancellationTokenSource.CreateLinkedTokenSource(appCt);
@@ -448,7 +454,6 @@ public static partial class KMShareGuiWindow
             }
             finally
             {
-                GC.KeepAlive(_buttonSubclasses);
                 GC.KeepAlive(this);
                 hid.OnRemoteStateChanged -= remoteStateSubscriber;
                 StopActiveSession();
@@ -508,14 +513,21 @@ public static partial class KMShareGuiWindow
                 WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
                 IDC_LV_PEERS, _fontRegular);
 
+            SendMessageW(_lvPeers, CCM_SETUNICODEFORMAT, (IntPtr)1, IntPtr.Zero);
+            IntPtr hHeader = SendMessageW(_lvPeers, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
+            if (hHeader != IntPtr.Zero)
+            {
+                SendMessageW(hHeader, CCM_SETUNICODEFORMAT, (IntPtr)1, IntPtr.Zero);
+            }
+
             uint exStyles = LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER;
             SendMessageW(_lvPeers, LVM_SETEXTENDEDLISTVIEWSTYLE, (IntPtr)exStyles, (IntPtr)exStyles);
 
-            InsertListViewColumn(_lvPeers, 0, LocalizationManager.Get(LocKey.ColHost), S(190));
-            InsertListViewColumn(_lvPeers, 1, LocalizationManager.Get(LocKey.ColIp), S(125));
-            InsertListViewColumn(_lvPeers, 2, LocalizationManager.Get(LocKey.ColBtMac), S(150));
-            InsertListViewColumn(_lvPeers, 3, LocalizationManager.Get(LocKey.ColArpMac), S(140));
-            InsertListViewColumn(_lvPeers, 4, LocalizationManager.Get(LocKey.ColDiag), S(340));
+            InsertListViewColumn(_lvPeers, 0, LocalizationManager.Get(LocKey.ColHost), S(185));
+            InsertListViewColumn(_lvPeers, 1, LocalizationManager.Get(LocKey.ColIp), S(120));
+            InsertListViewColumn(_lvPeers, 2, LocalizationManager.Get(LocKey.ColBtMac), S(145));
+            InsertListViewColumn(_lvPeers, 3, LocalizationManager.Get(LocKey.ColArpMac), S(135));
+            InsertListViewColumn(_lvPeers, 4, LocalizationManager.Get(LocKey.ColDiag), S(240));
 
             // Card 3A Controls: Target Endpoints & Connection Mode
             _txtTargetIp = CreateEditControl(hWnd, _config.LastTargetIp, IDC_TXT_TARGET_IP, _fontRegular);
@@ -1188,6 +1200,13 @@ public static partial class KMShareGuiWindow
             SetListViewColumnText(_lvPeers, 3, LocalizationManager.Get(LocKey.ColArpMac));
             SetListViewColumnText(_lvPeers, 4, LocalizationManager.Get(LocKey.ColDiag));
 
+            if (!_isScanning)
+            {
+                _scanSummaryText = _discoveredPeers != null && _discoveredPeers.Count > 0
+                    ? LocalizationManager.Format(LocKey.ScanSummaryFound, _discoveredPeers.Count)
+                    : LocalizationManager.Get(LocKey.ScanSummaryInitial);
+            }
+
             if (_hwndMain != IntPtr.Zero)
             {
                 SetWindowTextW(_hwndMain, $"{LocalizationManager.Get(LocKey.AppTitle)} ({Environment.MachineName})");
@@ -1209,7 +1228,7 @@ public static partial class KMShareGuiWindow
                 try
                 {
                     Marshal.StructureToPtr(col, colPtr, false);
-                    SendMessageW(hLv, 0x101A /* LVM_SETCOLUMNW */, index, colPtr);
+                    SendMessageW(hLv, LVM_SETCOLUMNW, (IntPtr)index, colPtr);
                 }
                 finally
                 {
@@ -1285,8 +1304,8 @@ public static partial class KMShareGuiWindow
             if (_isScanning) return;
             _isScanning = true;
             EnableWindow(_btnScanPeers, false);
-            SetButtonLabel(IDC_BTN_SCAN_PEERS, "Buscando na Rede e Bluetooth...");
-            _scanSummaryText = $"Varrendo sub-rede de {_localLanIp} (UDP Beacon + ARP L2 + Bluetooth)...";
+            SetButtonLabel(IDC_BTN_SCAN_PEERS, LocalizationManager.Get(LocKey.ScanningButton));
+            _scanSummaryText = LocalizationManager.Format(LocKey.ScanningSummaryScanning, _localLanIp);
             InvalidateRect(_hwndMain, IntPtr.Zero, false);
 
             IPAddress scanIp = _localLanIp;
@@ -1304,8 +1323,8 @@ public static partial class KMShareGuiWindow
                         _discoveredPeers = peers;
                         PopulatePeersListView(peers);
                         _scanSummaryText = peers.Count > 0
-                            ? $"{peers.Count} dispositivo(s) encontrado(s). Clique em uma linha para preencher IP, MAC Bluetooth e Modo."
-                            : "Nenhum dispositivo respondeu ainda. Verifique a rede ou informe o IP/Hostname manualmente.";
+                            ? LocalizationManager.Format(LocKey.ScanSummaryFound, peers.Count)
+                            : LocalizationManager.Get(LocKey.ScanSummaryNone);
                         InvalidateRect(_hwndMain, IntPtr.Zero, false);
                     });
                 }
@@ -1319,7 +1338,7 @@ public static partial class KMShareGuiWindow
                     {
                         _isScanning = false;
                         EnableWindow(_btnScanPeers, true);
-                        SetButtonLabel(IDC_BTN_SCAN_PEERS, "Buscar Dispositivos na Rede e Bluetooth");
+                        SetButtonLabel(IDC_BTN_SCAN_PEERS, LocalizationManager.Get(LocKey.ScanPeersButton));
                     });
                 }
             });
@@ -2176,7 +2195,7 @@ public static partial class KMShareGuiWindow
             DeleteIfValid(_brushCardBg);
             DeleteIfValid(_brushEditBg);
             DeleteIfValid(_brushLogBg);
-            _buttonSubclasses.Clear();
+            s_buttonStates.Clear();
             GC.SuppressFinalize(this);
         }
 
@@ -2210,8 +2229,16 @@ public static partial class KMShareGuiWindow
                 Variant = variant
             };
             _buttonsById[id] = state;
+            s_buttonStates[hBtn] = state;
+            SetWindowSubclass(hBtn, s_buttonSubclassProc, (UIntPtr)id, IntPtr.Zero);
 
-            nint proc(nint hW, uint uMsg, nint wP, nint lP, nuint uId, nint dwRef)
+            return hBtn;
+        }
+
+        private static IntPtr StaticButtonSubclassProc(
+            IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData)
+        {
+            if (s_buttonStates.TryGetValue(hWnd, out var state))
             {
                 if (uMsg == WM_MOUSEMOVE && !state.IsHovered)
                 {
@@ -2220,23 +2247,23 @@ public static partial class KMShareGuiWindow
                     {
                         cbSize = Marshal.SizeOf<TRACKMOUSEEVENT>(),
                         dwFlags = 0x00000002 /* TME_LEAVE */,
-                        hwndTrack = hW,
+                        hwndTrack = hWnd,
                         dwHoverTime = 0
                     };
                     TrackMouseEvent(ref tme);
-                    InvalidateRect(hW, IntPtr.Zero, false);
+                    InvalidateRect(hWnd, IntPtr.Zero, false);
                 }
                 else if (uMsg == WM_MOUSELEAVE && state.IsHovered)
                 {
                     state.IsHovered = false;
-                    InvalidateRect(hW, IntPtr.Zero, false);
+                    InvalidateRect(hWnd, IntPtr.Zero, false);
                 }
-                return DefSubclassProc(hW, uMsg, wP, lP);
+                else if (uMsg == WM_NCDESTROY)
+                {
+                    s_buttonStates.TryRemove(hWnd, out _);
+                }
             }
-            _buttonSubclasses[hBtn] = proc;
-            SetWindowSubclass(hBtn, proc, (UIntPtr)id, IntPtr.Zero);
-
-            return hBtn;
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
         }
 
         private IntPtr CreateEditControl(IntPtr hParent, string text, int id, IntPtr font)
