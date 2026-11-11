@@ -1,9 +1,9 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace MKShare.Security;
+namespace KMShare.Security;
 
 public sealed class FileTransferGatekeeper
 {
@@ -101,7 +101,7 @@ public static class OsStepUpAuth
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             return RunProcessAuth("/usr/bin/osascript",
-                $"-e \"display dialog \\\"{promptMessage}\\\" with title \\\"MKShare Auth\\\" buttons {{\\\"Cancel\\\", \\\"Allow\\\"}} default button \\\"Allow\\\"\"");
+                $"-e \"display dialog \\\"{promptMessage}\\\" with title \\\"KMShare Auth\\\" buttons {{\\\"Cancel\\\", \\\"Allow\\\"}} default button \\\"Allow\\\"\"");
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -161,7 +161,7 @@ public static class OsStepUpAuth
         var info = new CREDUI_INFO
         {
             cbSize = Marshal.SizeOf<CREDUI_INFO>(),
-            pszCaptionText = "MKShare - Autorização por Transação",
+            pszCaptionText = "KMShare - Autorização por Transação",
             pszMessageText = message
         };
         uint authPackage = 0;

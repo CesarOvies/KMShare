@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="assets/logo.svg" alt="KMShare Logo" width="160" />
 </p>
 <h1 align="center">KMShare</h1>
@@ -134,7 +134,7 @@ sequenceDiagram
     Note over S,R: 2. Handshake Criptográfico Mútuo (ECDH P-256 + HKDF-SHA256)
     S->>R: WireHello (0x10 + PubKey_S)
     R-->>S: WireHelloAck (0x11 + PubKey_R)
-    Note over S,R: Chave = HKDF-SHA256(ECDH_Secret, salt=PIN, info="MKSHARE_HID_SESSION_V1")
+    Note over S,R: Chave = HKDF-SHA256(ECDH_Secret, salt=PIN, info="KMSHARE_HID_SESSION_V1")
 
     Note over S,R: 3. Travessia de Borda e Stream HID (AES-256-GCM)
     S->>R: WireEdgeEnter (0x2F + Edge + NormCoord 0..10000)
@@ -256,7 +256,7 @@ KMShare/
 │   │   ├── SecureHidSession.cs                # ECDH P-256 + HKDF-SHA256 + AES-256-GCM + Kill-Switch + TrustedPeerVault
 │   │   └── FileTransferGatekeeper.cs          # Step-Up Auth nativo do SO + Token HMAC de uso único (48 bytes)
 │   ├── Network/
-│   │   ├── MKSharePeerNode.cs                 # Nó Dual-Stack (LAN UDP :51820 + Bluetooth + Receptor de Arquivos :51821)
+│   │   ├── KMSharePeerNode.cs                 # Nó Dual-Stack (LAN UDP :51820 + Bluetooth + Receptor de Arquivos :51821)
 │   │   ├── NetworkPeerDiscovery.cs            # Scanner híbrido (Beacon UDP :51822/:51820 + SendARP /24 + Bluetooth)
 │   │   ├── BluetoothRfcommNode.cs             # Transporte Out-of-Band RFCOMM (Win AF_BTH=32 / Linux BlueZ=31)
 │   │   ├── VpnFallbackModes.cs                # Orquestrador Modos A/B/C + BluetoothMouseCoalescer (1000Hz -> 133Hz)

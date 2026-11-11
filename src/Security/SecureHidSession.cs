@@ -1,10 +1,10 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace MKShare.Security;
+namespace KMShare.Security;
 
 public enum PacketStatus
 {
@@ -107,7 +107,7 @@ public sealed class SecureHidSession(int maxDistinctKeystrokesPerSecond = 30) : 
             sharedSecret,
             outputLength: 32,
             salt: pinBytes,
-            info: "MKSHARE_HID_V1"u8.ToArray());
+            info: "KMSHARE_HID_V1"u8.ToArray());
 
         CryptographicOperations.ZeroMemory(sharedSecret);
         _txSeq = 0;

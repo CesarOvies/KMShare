@@ -1,7 +1,7 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 
-namespace MKShare.Security;
+namespace KMShare.Security;
 
 public sealed class IntranetSecurityException(string message) : Exception(message);
 

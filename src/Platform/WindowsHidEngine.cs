@@ -1,7 +1,7 @@
-using System.Runtime.InteropServices;
-using MKShare.Security;
+﻿using System.Runtime.InteropServices;
+using KMShare.Security;
 
-namespace MKShare.Platform;
+namespace KMShare.Platform;
 
 public sealed class WindowsHidEngine : IHidPlatform
 {

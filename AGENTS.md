@@ -1,4 +1,4 @@
-# AGENTS.md — Guia de Contexto, Arquitetura e Regras para Agentes de IA (KMShare)
+﻿# AGENTS.md — Guia de Contexto, Arquitetura e Regras para Agentes de IA (KMShare)
 
 Este documento fornece o contexto técnico completo, invariantes de segurança, diretrizes de UI e procedimentos de verificação obrigatórios para qualquer agente de IA que atue no repositório **KMShare**.
 
@@ -14,7 +14,7 @@ O **KMShare** é um software KVM virtual (Mouse e Teclado por travessia de borda
   - [`SecureHidSession.cs`](src/Security/SecureHidSession.cs): Handshake ECDH P-256 + HKDF-SHA256 (com PIN como salt), cifragem AES-256-GCM com contador monotônico de 64 bits, cofre `TrustedPeerVault` (DPAPI no Windows / `0600` AES-GCM no Linux/macOS) e Kill-Switch anti-anomalia.
   - [`FileTransferGatekeeper.cs`](src/Security/FileTransferGatekeeper.cs): Autorização Step-Up por transação (`CredUIPromptForWindowsCredentialsW`, `pkexec`, `osascript`) com emissão de token HMAC único de 48 bytes válido por 60 segundos.
 - **`src/Network/`**:
-  - [`MKSharePeerNode.cs`](src/Network/MKSharePeerNode.cs): Transporte LAN UDP (`:51820`), receptor Dual-Stack (UDP + Bluetooth RFCOMM + Canal de Arquivos TCP `:51821` + resposta a probes de descoberta).
+  - [`KMSharePeerNode.cs`](src/Network/KMSharePeerNode.cs): Transporte LAN UDP (`:51820`), receptor Dual-Stack (UDP + Bluetooth RFCOMM + Canal de Arquivos TCP `:51821` + resposta a probes de descoberta).
   - [`NetworkPeerDiscovery.cs`](src/Network/NetworkPeerDiscovery.cs): Descoberta automática de dispositivos na LAN via Beacon UDP (`:51822` e `:51820`), varredura paralela Camada 2 `SendARP` na sub-rede `/24` e enumeração de dispositivos Bluetooth pareados.
   - [`BluetoothRfcommNode.cs`](src/Network/BluetoothRfcommNode.cs): Transporte Out-of-Band RFCOMM (`AF_BTH=32` no Windows e `AF_BLUETOOTH=31` no Linux BlueZ, Canal `5`).
   - [`VpnFallbackModes.cs`](src/Network/VpnFallbackModes.cs): Orquestrador dos Modos A (LAN Direta), B (Step-Up `/32` Rota + Firewall) e C (Bluetooth Out-of-Band com `BluetoothMouseCoalescer` 1000Hz -> 133Hz).

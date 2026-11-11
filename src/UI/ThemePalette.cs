@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace MKShare.UI;
+namespace KMShare.UI;
 
 public enum AppTheme
 {
