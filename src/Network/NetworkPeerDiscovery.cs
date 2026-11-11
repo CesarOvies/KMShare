@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -6,10 +6,10 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using MKShare.Platform;
-using MKShare.Security;
+using KMShare.Platform;
+using KMShare.Security;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
 public sealed record PeerDiscoveryAnnouncement(
     string Hostname,
@@ -76,7 +76,7 @@ public static class NetworkPeerDiscovery
         string localBtMac,
         string role,
         ScreenEdge monitorEdge,
-        int udpPort = MKSharePeerNode.DefaultUdpPort,
+        int udpPort = KMSharePeerNode.DefaultUdpPort,
         int filePort = 51821)
     {
         var payload = new PeerDiscoveryAnnouncement(
@@ -267,7 +267,7 @@ public static class NetworkPeerDiscovery
                 try
                 {
                     await udpScanner.SendAsync(probePacket, new IPEndPoint(broadcastIp, DefaultDiscoveryUdpPort), ct);
-                    await udpScanner.SendAsync(probePacket, new IPEndPoint(broadcastIp, MKSharePeerNode.DefaultUdpPort), ct);
+                    await udpScanner.SendAsync(probePacket, new IPEndPoint(broadcastIp, KMSharePeerNode.DefaultUdpPort), ct);
                 }
                 catch
                 {
@@ -297,7 +297,7 @@ public static class NetworkPeerDiscovery
                         try
                         {
                             await udpScanner.SendAsync(probePacket, new IPEndPoint(candidateIp, DefaultDiscoveryUdpPort), ct);
-                            await udpScanner.SendAsync(probePacket, new IPEndPoint(candidateIp, MKSharePeerNode.DefaultUdpPort), ct);
+                            await udpScanner.SendAsync(probePacket, new IPEndPoint(candidateIp, KMSharePeerNode.DefaultUdpPort), ct);
                         }
                         catch
                         {

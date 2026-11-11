@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -7,11 +7,11 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
-using MKShare.FileTransfer;
-using MKShare.Network;
-using MKShare.Platform;
-using MKShare.Security;
-using MKShare.UI;
+using KMShare.FileTransfer;
+using KMShare.Network;
+using KMShare.Platform;
+using KMShare.Security;
+using KMShare.UI;
 
 namespace KMShare;
 
@@ -66,14 +66,14 @@ internal static class Program
                 case "--listen":
                 {
                     string pin = args.Length >= 2 ? args[1] : TrayAndEdgeManager.LoadOrCreateConfig().PairingPin;
-                    await MKSharePeerNode.RunReceiverAsync(localLanIp, MKSharePeerNode.DefaultUdpPort, pin, cts.Token);
+                    await KMSharePeerNode.RunReceiverAsync(localLanIp, KMSharePeerNode.DefaultUdpPort, pin, cts.Token);
                     return 0;
                 }
                 case "--connect" when args.Length >= 2:
                 {
                     IPAddress targetIp = IPAddress.Parse(args[1]);
                     string pin = args.Length >= 3 ? args[2] : TrayAndEdgeManager.LoadOrCreateConfig().PairingPin;
-                    await MKSharePeerNode.RunSenderAsync(localLanIp, targetIp, MKSharePeerNode.DefaultUdpPort, pin, cts.Token);
+                    await KMSharePeerNode.RunSenderAsync(localLanIp, targetIp, KMSharePeerNode.DefaultUdpPort, pin, cts.Token);
                     return 0;
                 }
                 case "--listen-bt":
@@ -480,8 +480,8 @@ internal static class Program
         Console.WriteLine($"  -> Crossing Bottom Edge (1920x1080 @ X=480 -> norm={normQuarterX}) into 2560x1440: Entry=({rxBottom}, {ryBottom})");
         Trace.Assert(rxBottom == 640 && ryBottom == 10);
 
-        byte[] wireEnter = EdgeCoordinateMapper.EncodeWireEdgePacket(MKSharePeerNode.WireEdgeEnter, ScreenEdge.Top, 7500);
-        bool decodedOk = EdgeCoordinateMapper.TryDecodeWireEdgePacket(wireEnter, MKSharePeerNode.WireEdgeEnter, ScreenEdge.Right, out ScreenEdge decEdge, out ushort decNorm);
+        byte[] wireEnter = EdgeCoordinateMapper.EncodeWireEdgePacket(KMSharePeerNode.WireEdgeEnter, ScreenEdge.Top, 7500);
+        bool decodedOk = EdgeCoordinateMapper.TryDecodeWireEdgePacket(wireEnter, KMSharePeerNode.WireEdgeEnter, ScreenEdge.Right, out ScreenEdge decEdge, out ushort decNorm);
         Trace.Assert(decodedOk && decEdge == ScreenEdge.Top && decNorm == 7500);
 
         string tempVaultPath = Path.Combine(Path.GetTempPath(), $"kmshare_test_{Guid.NewGuid():N}.vault");
@@ -523,11 +523,11 @@ internal static class Program
             for (int cycle = 0; cycle < 2; cycle++)
             {
                 var req = await rxUdp.ReceiveAsync(cts.Token);
-                Trace.Assert(req.Buffer[0] == MKSharePeerNode.WireHello);
+                Trace.Assert(req.Buffer[0] == KMSharePeerNode.WireHello);
                 var (rEcdh, rPub) = SecureHidSession.CreateHandshakeKeyPair();
                 using (rEcdh)
                 {
-                    byte[] ack = [MKSharePeerNode.WireHelloAck, .. rPub];
+                    byte[] ack = [KMSharePeerNode.WireHelloAck, .. rPub];
                     await rxUdp.SendAsync(ack, req.RemoteEndPoint, cts.Token);
                 }
             }
@@ -538,7 +538,7 @@ internal static class Program
         {
             var reconnVault = new TrustedPeerVault(tempReconnectVaultPath);
             using var session1 = new SecureHidSession();
-            bool firstConnect = await MKSharePeerNode.TryPerformUdpHandshakeAsync(
+            bool firstConnect = await KMSharePeerNode.TryPerformUdpHandshakeAsync(
                 txUdp,
                 new IPEndPoint(IPAddress.Loopback, port),
                 session1,
@@ -551,7 +551,7 @@ internal static class Program
             Trace.Assert(!platform.IsRemoteActive, "Local input must be released on network loss!");
 
             using var session2 = new SecureHidSession();
-            bool reconnected = await MKSharePeerNode.TryPerformUdpHandshakeAsync(
+            bool reconnected = await KMSharePeerNode.TryPerformUdpHandshakeAsync(
                 txUdp,
                 new IPEndPoint(IPAddress.Loopback, port),
                 session2,
@@ -715,7 +715,7 @@ internal static class Program
                     "AA:BB:CC:DD:EE:FF",
                     "Receptor Ativo",
                     ScreenEdge.Left,
-                    MKSharePeerNode.DefaultUdpPort);
+                    KMSharePeerNode.DefaultUdpPort);
                 await discRx.SendAsync(annBytes, req.RemoteEndPoint, discCts.Token);
             }, discCts.Token);
 

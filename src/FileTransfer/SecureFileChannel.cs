@@ -1,12 +1,12 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using MKShare.Security;
+using KMShare.Security;
 
-namespace MKShare.FileTransfer;
+namespace KMShare.FileTransfer;
 
 public enum FileTransferStatus
 {
@@ -314,7 +314,7 @@ public sealed class SecureFileChannel
                 sharedSecret,
                 outputLength: 32,
                 salt: Encoding.UTF8.GetBytes(pin),
-                info: "MKSHARE_FILE_V1"u8.ToArray());
+                info: "KMSHARE_FILE_V1"u8.ToArray());
         }
         finally
         {

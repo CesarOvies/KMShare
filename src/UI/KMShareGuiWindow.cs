@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -6,13 +6,13 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KMShare;
-using MKShare.FileTransfer;
-using MKShare.Network;
-using MKShare.Localization;
-using MKShare.Platform;
-using MKShare.Security;
+using KMShare.FileTransfer;
+using KMShare.Network;
+using KMShare.Localization;
+using KMShare.Platform;
+using KMShare.Security;
 
-namespace MKShare.UI;
+namespace KMShare.UI;
 
 public static partial class KMShareGuiWindow
 {
@@ -328,8 +328,8 @@ public static partial class KMShareGuiWindow
             _logTeeWriter = new GuiLogTeeWriter(_originalConsoleOut, AppendLogLineThreadSafe);
             Console.SetOut(_logTeeWriter);
 
-            MKSharePeerNode.CustomVpnFallbackPrompt = PromptVpnFallbackDialog;
-            MKSharePeerNode.CustomBluetoothTargetSelector = GetSelectedBluetoothTarget;
+            KMSharePeerNode.CustomVpnFallbackPrompt = PromptVpnFallbackDialog;
+            KMSharePeerNode.CustomBluetoothTargetSelector = GetSelectedBluetoothTarget;
         }
 
         private int S(int px) => (int)Math.Round(px * _dpiScale);
@@ -1489,12 +1489,12 @@ public static partial class KMShareGuiWindow
 
             if (_config.DeviceRole == DeviceOperationRole.ReceiverControlled)
             {
-                AppendLogLine($"[Operação] Iniciando MODO RECEPTOR em {localIp}:{MKSharePeerNode.DefaultUdpPort} + Bluetooth ({_localBtMac}) + Arquivos (:{SecureFileChannel.DefaultTcpFilePort})...");
+                AppendLogLine($"[Operação] Iniciando MODO RECEPTOR em {localIp}:{KMSharePeerNode.DefaultUdpPort} + Bluetooth ({_localBtMac}) + Arquivos (:{SecureFileChannel.DefaultTcpFilePort})...");
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await MKSharePeerNode.RunReceiverAsync(localIp, MKSharePeerNode.DefaultUdpPort, pin, sessionToken);
+                        await KMSharePeerNode.RunReceiverAsync(localIp, KMSharePeerNode.DefaultUdpPort, pin, sessionToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -1557,22 +1557,22 @@ public static partial class KMShareGuiWindow
                         return;
                     }
 
-                    IntranetGuard.EnforceLanEndpoint(new IPEndPoint(targetIp, MKSharePeerNode.DefaultUdpPort));
+                    IntranetGuard.EnforceLanEndpoint(new IPEndPoint(targetIp, KMSharePeerNode.DefaultUdpPort));
 
                     if (connModeIdx == 2)
                     {
                         AppendLogLineThreadSafe($"[Modo B] Solicitando autorização Step-Up para rota /32 e firewall UDP para {targetIp}...");
-                        bool okB = MKSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, MKSharePeerNode.DefaultUdpPort);
+                        bool okB = KMSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, KMSharePeerNode.DefaultUdpPort);
                         AppendLogLineThreadSafe(okB
                             ? $"[Modo B] Exceção /32 aplicada para {targetIp}!"
                             : "[Modo B] Elevação não aplicada; tentando conexão LAN...");
                     }
 
-                    AppendLogLineThreadSafe($"[Operação] Conectando como CONTROLADOR via LAN ({localIp} -> {targetIp}:{MKSharePeerNode.DefaultUdpPort})...");
-                    await MKSharePeerNode.RunSenderAsync(
+                    AppendLogLineThreadSafe($"[Operação] Conectando como CONTROLADOR via LAN ({localIp} -> {targetIp}:{KMSharePeerNode.DefaultUdpPort})...");
+                    await KMSharePeerNode.RunSenderAsync(
                         localIp,
                         targetIp,
-                        MKSharePeerNode.DefaultUdpPort,
+                        KMSharePeerNode.DefaultUdpPort,
                         pin,
                         sessionToken,
                         autoReconnectOnNetworkLoss: true);
@@ -1632,7 +1632,7 @@ public static partial class KMShareGuiWindow
                 {
                     string btMac = GetControlText(_txtTargetBtMac).Trim();
                     string msg =
-                        $"Não houve resposta UDP de {targetIp}:{MKSharePeerNode.DefaultUdpPort}.\n\n" +
+                        $"Não houve resposta UDP de {targetIp}:{KMSharePeerNode.DefaultUdpPort}.\n\n" +
                         "Causas comuns:\n" +
                         "  1. O outro computador ainda não iniciou o 'Modo Receptor'.\n" +
                         "  2. Uma VPN com Kill-Switch está bloqueando a Camada 3.\n\n" +
@@ -1775,7 +1775,7 @@ public static partial class KMShareGuiWindow
                     return;
                 }
 
-                bool ok = MKSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, MKSharePeerNode.DefaultUdpPort);
+                bool ok = KMSharePeerNode.TryApplyModeBStepUpFirewallAndRoute(localIp, targetIp, KMSharePeerNode.DefaultUdpPort);
                 AppendLogLineThreadSafe(ok
                     ? $"[Modo B] Rota /32 e regra de Firewall para {targetIp} aplicadas com sucesso!"
                     : "[Modo B] Operação cancelada pelo usuário ou não aplicada.");
@@ -2355,8 +2355,8 @@ public static partial class KMShareGuiWindow
             _activeSessionCts?.Dispose();
             RemoveSystemTrayIcon();
 
-            MKSharePeerNode.CustomVpnFallbackPrompt = null;
-            MKSharePeerNode.CustomBluetoothTargetSelector = null;
+            KMSharePeerNode.CustomVpnFallbackPrompt = null;
+            KMSharePeerNode.CustomBluetoothTargetSelector = null;
             Console.SetOut(_originalConsoleOut);
             _logTeeWriter.Dispose();
 

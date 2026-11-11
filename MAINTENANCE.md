@@ -1,4 +1,4 @@
-# KMShare — Manual de Manutenção, Sustentação e Invariantes para Agentes
+﻿# KMShare — Manual de Manutenção, Sustentação e Invariantes para Agentes
 
 > **ESCOPO:** Referência técnica obrigatória para agentes de IA encarregados da manutenção corretiva, evolutiva e sustentação do **KMShare**. Qualquer alteração de código deve preservar 100% dos invariantes arquiteturais, criptográficos e de sistema operacional abaixo.
 
@@ -19,7 +19,7 @@ KMShare/
 │   │   ├── SecureHidSession.cs                # ECDH P-256 + HKDF-SHA256 + AES-256-GCM + Kill-Switch + TrustedPeerVault
 │   │   └── FileTransferGatekeeper.cs          # Step-Up Auth por transação + Token HMAC de uso único (48 bytes)
 │   ├── Network/
-│   │   ├── MKSharePeerNode.cs                 # Transporte LAN UDP (:51820), Heartbeat 500ms, Reconexão e WireEdgeEnter/Return
+│   │   ├── KMSharePeerNode.cs                 # Transporte LAN UDP (:51820), Heartbeat 500ms, Reconexão e WireEdgeEnter/Return
 │   │   ├── NetworkPeerDiscovery.cs            # Descoberta LAN (Beacon UDP :51822/:51820 + Sub-rede /24 SendARP L2 + Bluetooth)
 │   │   ├── BluetoothRfcommNode.cs             # Transporte Out-of-Band RFCOMM (Win AF_BTH=32 / Linux BlueZ AF_BLUETOOTH=31)
 │   │   ├── VpnFallbackModes.cs                # Orquestrador Modos A/B/C + BluetoothMouseCoalescer (1000Hz -> 133Hz)
@@ -50,7 +50,7 @@ KMShare/
    - Registro de inicialização automática ([`TrayAndEdgeManager.cs`](src/UI/TrayAndEdgeManager.cs)) opera exclusivamente no escopo do usuário (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, `~/.config/autostart`, `~/Library/LaunchAgents`).
 
 2. **Isolamento Estrito de Intranet no Core (`IntranetGuard`):**
-   - Todo endpoint IP em [`MKSharePeerNode.cs`](src/Network/MKSharePeerNode.cs) e [`SecureFileChannel.cs`](src/FileTransfer/SecureFileChannel.cs) passa obrigatoriamente por [`IntranetGuard.EnforceLanEndpoint`](src/Security/IntranetGuard.cs).
+   - Todo endpoint IP em [`KMSharePeerNode.cs`](src/Network/KMSharePeerNode.cs) e [`SecureFileChannel.cs`](src/FileTransfer/SecureFileChannel.cs) passa obrigatoriamente por [`IntranetGuard.EnforceLanEndpoint`](src/Security/IntranetGuard.cs).
    - Apenas faixas RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Link-Local (`169.254.0.0/16`, `fe80::/10`), ULA (`fc00::/7`) e Loopback são permitidas. Qualquer IP público dispara `IntranetSecurityException`.
    - O processo principal `KMShare` **jamais** realiza conexões à Internet.
 
@@ -91,7 +91,7 @@ KMShare/
 4. **Fallback UIPI no Receptor Windows ([`WindowsHidEngine.cs`](src/Platform/WindowsHidEngine.cs)):**
    - Se `SendInput` retornar `0` em `MouseMove` (janela elevada em foco no receptor), manter o fallback imediato com `GetCursorPos` + `SetCursorPos`.
 
-5. **Proteção `SIO_UDP_CONNRESET` no Windows ([`MKSharePeerNode.cs`](src/Network/MKSharePeerNode.cs)):**
+5. **Proteção `SIO_UDP_CONNRESET` no Windows ([`KMSharePeerNode.cs`](src/Network/KMSharePeerNode.cs)):**
    - Todo `UdpClient` no Windows deve chamar `DisableWindowsUdpConnReset` (`IOControl(-1744830452)`) após a criação.
 
 ---
@@ -112,7 +112,7 @@ KMShare/
 - `0xFF` (`WireRevoked`): `[0xFF, PacketStatus(1B)]`
 
 ### 4.2 Canal de Transferência de Arquivos (TCP `:51821` — [`SecureFileChannel.cs`](src/FileTransfer/SecureFileChannel.cs))
-1. **Handshake:** `FrameHello (0x10)` / `FrameHelloAck (0x11)` -> Deriva chave de sessão via `ECDH P-256 + HKDF-SHA256 (info="MKSHARE_FILE_V1")`.
+1. **Handshake:** `FrameHello (0x10)` / `FrameHelloAck (0x11)` -> Deriva chave de sessão via `ECDH P-256 + HKDF-SHA256 (info="KMSHARE_FILE_V1")`.
 2. **Etapa 1 (`FrameOffer = 0x20`):** Envia JSON cifrado `{ FileName, FileSize, Sha256Hex }`.
 3. **Etapa 2 (`FrameTokenIssued = 0x21` / `FrameTokenDenied = 0x22`):** Receptor solicita consentimento do usuário via `OsStepUpAuth` e retorna o `OneTimeToken` de 48 bytes (`Nonce[16] + HMAC_SHA256[32]`).
 4. **Etapa 3 (`FrameChunk = 0x30` + `FrameCommit = 0x31` -> `FrameResult = 0x40`):** Blocos de 16 KB são gravados em `.part`, validados contra `FileTransferGatekeeper.TryCommitTransfer` e só então comitados no destino final.

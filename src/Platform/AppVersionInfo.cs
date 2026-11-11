@@ -1,6 +1,6 @@
-using System.Reflection;
+﻿using System.Reflection;
 
-namespace MKShare.Platform;
+namespace KMShare.Platform;
 
 /// <summary>
 /// Provedor centralizado da versão do KMShare em tempo de execução.

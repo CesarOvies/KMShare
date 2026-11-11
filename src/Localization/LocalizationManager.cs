@@ -1,7 +1,7 @@
-using System.Globalization;
-using MKShare.Platform;
+﻿using System.Globalization;
+using KMShare.Platform;
 
-namespace MKShare.Localization;
+namespace KMShare.Localization;
 
 public enum AppLanguage
 {

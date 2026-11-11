@@ -1,14 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using MKShare.FileTransfer;
-using MKShare.Localization;
-using MKShare.Network;
-using MKShare.Platform;
+using KMShare.FileTransfer;
+using KMShare.Localization;
+using KMShare.Network;
+using KMShare.Platform;
 
-namespace MKShare.UI;
+namespace KMShare.UI;
 
 public enum DeviceOperationRole
 {
@@ -273,7 +273,7 @@ public static class TrayAndEdgeManager
                 }
                 case "1":
                 {
-                    await MKSharePeerNode.RunReceiverAsync(localLanIp, MKSharePeerNode.DefaultUdpPort, config.PairingPin, ct);
+                    await KMSharePeerNode.RunReceiverAsync(localLanIp, KMSharePeerNode.DefaultUdpPort, config.PairingPin, ct);
                     break;
                 }
                 case "2":
@@ -285,7 +285,7 @@ public static class TrayAndEdgeManager
                     string activePin = string.IsNullOrWhiteSpace(pinInput) ? config.PairingPin : pinInput;
                     if (IPAddress.TryParse(ipStr, out IPAddress? targetIp))
                     {
-                        await MKSharePeerNode.RunSenderAsync(localLanIp, targetIp, MKSharePeerNode.DefaultUdpPort, activePin, ct);
+                        await KMSharePeerNode.RunSenderAsync(localLanIp, targetIp, KMSharePeerNode.DefaultUdpPort, activePin, ct);
                     }
                     break;
                 }

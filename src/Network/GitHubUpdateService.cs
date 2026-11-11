@@ -1,12 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using MKShare.Platform;
-using MKShare.UI;
+using KMShare.Platform;
+using KMShare.UI;
 
-namespace MKShare.Network;
+namespace KMShare.Network;
 
 public sealed record GitHubReleaseAsset(
     string Name,
