@@ -220,19 +220,22 @@ jobs:
           ### 📦 Downloads Disponíveis
 
           #### 🪟 Windows (win-x64)
+          - **Executável Standalone Direto (.exe / Sem Instalação)**: [`KMShare-v$($env:VERSION)-win-x64.exe`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64.exe)
+          - **Versão Portable (.zip)**: [`KMShare-v$($env:VERSION)-win-x64-portable.zip`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64-portable.zip)
           - **Instalador Oficial (User-Space / Sem Admin)**: [`KMShare-v$($env:VERSION)-win-x64-installer.exe`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64-installer.exe) *(se compilado via Inno Setup)*
           - **Script Instalador PowerShell**: [`Install-KMShare.ps1`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/Install-KMShare.ps1)
-          - **Versão Portable (.zip)**: [`KMShare-v$($env:VERSION)-win-x64-portable.zip`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64-portable.zip)
 
           #### 🐧 Linux (linux-x64)
+          - **Binário Standalone Direto (Sem Instalação)**: [`KMShare-v$($env:VERSION)-linux-x64`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64)
+          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz)
           - **Pacote Debian (.deb)**: [`KMShare-v$($env:VERSION)-linux-x64.deb`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64.deb) *(instalação via `sudo dpkg -i` ou `apt`)*
           - **Instalador User-Space Standalone (Zero-Sudo)**: [`KMShare-v$($env:VERSION)-linux-x64-installer.sh`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64-installer.sh)
-          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz)
 
           #### 🍏 macOS (osx-arm64 Apple Silicon)
+          - **Binário Standalone Direto (Sem Instalação)**: [`KMShare-v$($env:VERSION)-osx-arm64`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64)
+          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz)
           - **Pacote macOS App Bundle (.zip)**: [`KMShare-v$($env:VERSION)-osx-arm64-app.zip`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-app.zip) *(contém `KMShare.app` e instalador)*
           - **Script Instalador Standalone**: [`KMShare-v$($env:VERSION)-osx-arm64-installer.sh`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-installer.sh)
-          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz)
 
           ---
 

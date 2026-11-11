@@ -12,4 +12,10 @@
     <ApplicationIcon>assets\KMShare.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);updater\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="assets\KMShare.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

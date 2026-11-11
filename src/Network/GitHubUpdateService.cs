@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Formats.Tar;
+using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -239,6 +241,105 @@ public static class GitHubUpdateService
         }
     }
 
+    public static GitHubReleaseAsset? ResolveExecutableAsset(
+        IEnumerable<GitHubReleaseAsset> assets,
+        OSPlatform platform)
+    {
+        var list = assets as IList<GitHubReleaseAsset> ?? assets.ToList();
+        if (list.Count == 0) return null;
+
+        if (platform == OSPlatform.Windows)
+        {
+            // 1. Executável standalone direto (.exe), excluindo instalador, setup e updater
+            var directExe = list.FirstOrDefault(a =>
+                (a.Name.EndsWith("-win-x64.exe", StringComparison.OrdinalIgnoreCase) ||
+                 a.Name.Equals("KMShare.exe", StringComparison.OrdinalIgnoreCase) ||
+                 (a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+                  a.Name.Contains("win-x64", StringComparison.OrdinalIgnoreCase))) &&
+                !a.Name.Contains("installer", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("setup", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("updater", StringComparison.OrdinalIgnoreCase));
+
+            if (directExe != null) return directExe;
+
+            // 2. Fallback de .exe genérico (sem instalador)
+            var genericExe = list.FirstOrDefault(a =>
+                a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("installer", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("setup", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("updater", StringComparison.OrdinalIgnoreCase));
+
+            if (genericExe != null) return genericExe;
+
+            // 3. Fallback: Pacote portátil (.zip) para extração direta de KMShare.exe
+            var portableZip = list.FirstOrDefault(a =>
+                a.Name.EndsWith("-win-x64-portable.zip", StringComparison.OrdinalIgnoreCase) ||
+                (a.Name.Contains("win-x64", StringComparison.OrdinalIgnoreCase) &&
+                 a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                 !a.Name.Contains("installer", StringComparison.OrdinalIgnoreCase)));
+
+            if (portableZip != null) return portableZip;
+
+            return null;
+        }
+
+        if (platform == OSPlatform.Linux)
+        {
+            // 1. Binário standalone direto Linux
+            var directBin = list.FirstOrDefault(a =>
+                (a.Name.EndsWith("-linux-x64", StringComparison.OrdinalIgnoreCase) ||
+                 a.Name.Equals("KMShare", StringComparison.OrdinalIgnoreCase) ||
+                 a.Name.Contains("linux-x64", StringComparison.OrdinalIgnoreCase)) &&
+                !a.Name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".deb", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sh", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sha512", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("installer", StringComparison.OrdinalIgnoreCase));
+
+            if (directBin != null) return directBin;
+
+            // 2. Fallback: Pacote portátil (.tar.gz) para extração direta de KMShare
+            var portableTar = list.FirstOrDefault(a =>
+                a.Name.EndsWith("-linux-x64-portable.tar.gz", StringComparison.OrdinalIgnoreCase) ||
+                (a.Name.Contains("linux-x64", StringComparison.OrdinalIgnoreCase) &&
+                 a.Name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)));
+
+            if (portableTar != null) return portableTar;
+
+            return null;
+        }
+
+        if (platform == OSPlatform.OSX)
+        {
+            // 1. Binário standalone direto macOS
+            var directBin = list.FirstOrDefault(a =>
+                (a.Name.EndsWith("-osx-arm64", StringComparison.OrdinalIgnoreCase) ||
+                 a.Name.Equals("KMShare", StringComparison.OrdinalIgnoreCase) ||
+                 a.Name.Contains("osx-arm64", StringComparison.OrdinalIgnoreCase)) &&
+                !a.Name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sh", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.EndsWith(".sha512", StringComparison.OrdinalIgnoreCase) &&
+                !a.Name.Contains("installer", StringComparison.OrdinalIgnoreCase));
+
+            if (directBin != null) return directBin;
+
+            // 2. Fallback: Pacote portátil (.tar.gz ou .zip) para extração direta de KMShare
+            var portableTar = list.FirstOrDefault(a =>
+                a.Name.EndsWith("-osx-arm64-portable.tar.gz", StringComparison.OrdinalIgnoreCase) ||
+                a.Name.EndsWith("-osx-arm64-app.zip", StringComparison.OrdinalIgnoreCase));
+
+            if (portableTar != null) return portableTar;
+
+            return null;
+        }
+
+        return null;
+    }
+
     public static async Task<bool> DownloadAndApplyUpdateAsync(
         UpdateCheckResult update,
         KMShareUserConfig? config = null,
@@ -248,68 +349,207 @@ public static class GitHubUpdateService
         try
         {
             string? token = TryGetGitHubToken(config);
+            OSPlatform currentPlatform =
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? OSPlatform.Windows :
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? OSPlatform.Linux :
+                RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? OSPlatform.OSX :
+                OSPlatform.Create("UNKNOWN");
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var asset = ResolveExecutableAsset(update.Assets, currentPlatform);
+            if (asset == null)
             {
-                var asset = update.Assets.FirstOrDefault(a => a.Name.EndsWith("-win-x64-installer.exe", StringComparison.OrdinalIgnoreCase))
-                         ?? update.Assets.FirstOrDefault(a => a.Name.EndsWith("-win-x64-portable.zip", StringComparison.OrdinalIgnoreCase));
+                progressLogger?.Invoke("Nenhum executável correspondente encontrado no release. Abrindo página de releases no navegador...");
+                OpenUrlInBrowser(update.ReleaseUrl);
+                return true;
+            }
 
-                if (asset == null)
+            string tempDir = Path.Combine(Path.GetTempPath(), "KMShare_Update");
+            Directory.CreateDirectory(tempDir);
+            string downloadedFilePath = Path.Combine(tempDir, asset.Name);
+
+            progressLogger?.Invoke($"Baixando {asset.Name} ({(asset.Size > 0 ? (asset.Size / 1024.0 / 1024.0).ToString("F1") + " MB" : "...")})...");
+
+            bool downloaded = await DownloadAssetToFileAsync(asset, update.LatestVersion, downloadedFilePath, token, progressLogger, ct);
+            if (!downloaded || !File.Exists(downloadedFilePath))
+            {
+                progressLogger?.Invoke("Falha no download do pacote de atualização.");
+                return false;
+            }
+
+            progressLogger?.Invoke("Download concluído com sucesso.");
+
+            var checksumAsset = update.Assets.FirstOrDefault(a => a.Name.Equals("CHECKSUMS.sha256", StringComparison.OrdinalIgnoreCase));
+            if (checksumAsset != null)
+            {
+                string checksumFile = Path.Combine(tempDir, "CHECKSUMS.sha256");
+                if (await DownloadAssetToFileAsync(checksumAsset, update.LatestVersion, checksumFile, token, null, ct))
                 {
-                    progressLogger?.Invoke("Nenhum executável Windows encontrado. Abrindo página de releases no navegador...");
-                    OpenUrlInBrowser(update.ReleaseUrl);
-                    return true;
-                }
-
-                string tempDir = Path.Combine(Path.GetTempPath(), "KMShare_Update");
-                Directory.CreateDirectory(tempDir);
-                string targetFile = Path.Combine(tempDir, asset.Name);
-
-                progressLogger?.Invoke($"Baixando {asset.Name} ({(asset.Size > 0 ? (asset.Size / 1024.0 / 1024.0).ToString("F1") + " MB" : "...")})...");
-
-                bool downloaded = await DownloadAssetToFileAsync(asset, update.LatestVersion, targetFile, token, progressLogger, ct);
-                if (!downloaded || !File.Exists(targetFile))
-                {
-                    progressLogger?.Invoke("Falha no download do pacote de atualização.");
-                    return false;
-                }
-
-                progressLogger?.Invoke("Download concluído com sucesso.");
-
-                var checksumAsset = update.Assets.FirstOrDefault(a => a.Name.Equals("CHECKSUMS.sha256", StringComparison.OrdinalIgnoreCase));
-                if (checksumAsset != null)
-                {
-                    string checksumFile = Path.Combine(tempDir, "CHECKSUMS.sha256");
-                    if (await DownloadAssetToFileAsync(checksumAsset, update.LatestVersion, checksumFile, token, null, ct))
+                    if (VerifySha256Checksum(downloadedFilePath, checksumFile))
                     {
-                        if (VerifySha256Checksum(targetFile, checksumFile))
-                        {
-                            progressLogger?.Invoke("Integridade criptográfica SHA-256 verificada e intacta.");
-                        }
-                        else
-                        {
-                            progressLogger?.Invoke("[AVISO] Divergência no hash SHA-256 do instalador.");
-                        }
+                        progressLogger?.Invoke("Integridade criptográfica SHA-256 verificada e intacta.");
+                    }
+                    else
+                    {
+                        progressLogger?.Invoke("[AVISO] Divergência no hash SHA-256 do arquivo baixado.");
                     }
                 }
+            }
 
-                progressLogger?.Invoke("Iniciando instalador do KMShare e encerrando instância atual...");
+            string targetExecutablePath = downloadedFilePath;
+            string targetBinaryName = currentPlatform == OSPlatform.Windows ? "KMShare.exe" : "KMShare";
 
-                var psi = new ProcessStartInfo
+            if (downloadedFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                progressLogger?.Invoke("Extraindo executável do pacote portátil .zip...");
+                using var zip = ZipFile.OpenRead(downloadedFilePath);
+                var entry = zip.Entries.FirstOrDefault(e => e.Name.Equals(targetBinaryName, StringComparison.OrdinalIgnoreCase));
+                if (entry != null)
                 {
-                    FileName = targetFile,
-                    UseShellExecute = true
-                };
+                    string extractedPath = Path.Combine(tempDir, targetBinaryName);
+                    entry.ExtractToFile(extractedPath, overwrite: true);
+                    targetExecutablePath = extractedPath;
+                }
+                else
+                {
+                    progressLogger?.Invoke($"Executável {targetBinaryName} não localizado no pacote .zip.");
+                    return false;
+                }
+            }
+            else if (downloadedFilePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+            {
+                progressLogger?.Invoke("Extraindo executável do pacote portátil .tar.gz...");
+                string extractDir = Path.Combine(tempDir, "extracted");
+                Directory.CreateDirectory(extractDir);
+                using (var fs = File.OpenRead(downloadedFilePath))
+                using (var gz = new GZipStream(fs, CompressionMode.Decompress))
+                {
+                    TarFile.ExtractToDirectory(gz, extractDir, overwriteFiles: true);
+                }
+                string? foundBinary = Directory.GetFiles(extractDir, targetBinaryName, SearchOption.AllDirectories).FirstOrDefault();
+                if (!string.IsNullOrEmpty(foundBinary))
+                {
+                    targetExecutablePath = foundBinary;
+                }
+                else
+                {
+                    progressLogger?.Invoke($"Executável {targetBinaryName} não localizado no pacote .tar.gz.");
+                    return false;
+                }
+            }
 
-                Process.Start(psi);
-                Environment.Exit(0);
-                return true;
+            string? currentProcessPath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
+
+            if (currentPlatform == OSPlatform.Windows)
+            {
+                if (!string.IsNullOrEmpty(currentProcessPath) && File.Exists(currentProcessPath))
+                {
+                    bool replaced = false;
+                    string backupPath = currentProcessPath + ".old";
+                    try
+                    {
+                        if (File.Exists(backupPath)) File.Delete(backupPath);
+                        File.Move(currentProcessPath, backupPath);
+                        File.Copy(targetExecutablePath, currentProcessPath, overwrite: true);
+                        replaced = true;
+                    }
+                    catch
+                    {
+                        // Fallback para processo desacoplado caso bloqueado
+                    }
+
+                    if (replaced)
+                    {
+                        progressLogger?.Invoke("Executável atualizado com sucesso. Reiniciando KMShare...");
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = currentProcessPath,
+                            UseShellExecute = true
+                        });
+                        Environment.Exit(0);
+                        return true;
+                    }
+                    else
+                    {
+                        progressLogger?.Invoke("Aplicando substituição do executável via processo desacoplado...");
+                        int currentPid = Environment.ProcessId;
+                        string script = $"Start-Sleep -Milliseconds 600; Wait-Process -Id {currentPid} -Timeout 5 -ErrorAction SilentlyContinue; Move-Item -Path '{targetExecutablePath}' -Destination '{currentProcessPath}' -Force; Start-Process '{currentProcessPath}'";
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "powershell",
+                            Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{script}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                        Environment.Exit(0);
+                        return true;
+                    }
+                }
+                else
+                {
+                    progressLogger?.Invoke($"Iniciando novo executável atualizado: {targetExecutablePath}");
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = targetExecutablePath,
+                        UseShellExecute = true
+                    });
+                    Environment.Exit(0);
+                    return true;
+                }
             }
             else
             {
-                progressLogger?.Invoke($"Abrindo release v{update.LatestVersion} no navegador...");
-                OpenUrlInBrowser(update.ReleaseUrl);
-                return true;
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+                {
+                    try
+                    {
+                        File.SetUnixFileMode(targetExecutablePath,
+                            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                    }
+                    catch { }
+                }
+
+                if (!string.IsNullOrEmpty(currentProcessPath) && File.Exists(currentProcessPath))
+                {
+                    bool replaced = false;
+                    try
+                    {
+                        File.Move(targetExecutablePath, currentProcessPath, overwrite: true);
+                        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+                        {
+                            File.SetUnixFileMode(currentProcessPath,
+                                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                        }
+                        replaced = true;
+                    }
+                    catch
+                    {
+                    }
+
+                    string exeToRun = replaced ? currentProcessPath : targetExecutablePath;
+                    progressLogger?.Invoke($"Executável atualizado com sucesso. Reiniciando KMShare ({exeToRun})...");
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = exeToRun,
+                        UseShellExecute = true
+                    });
+                    Environment.Exit(0);
+                    return true;
+                }
+                else
+                {
+                    progressLogger?.Invoke($"Iniciando novo executável atualizado: {targetExecutablePath}");
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = targetExecutablePath,
+                        UseShellExecute = true
+                    });
+                    Environment.Exit(0);
+                    return true;
+                }
             }
         }
         catch (Exception ex)

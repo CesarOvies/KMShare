@@ -19,6 +19,8 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        CleanupPendingOldExecutable();
+
         bool isGuiLaunch = args.Length == 0 ||
             args[0].Equals("--gui", StringComparison.OrdinalIgnoreCase) ||
             args[0].Equals("--tray", StringComparison.OrdinalIgnoreCase);
@@ -853,7 +855,49 @@ internal static class Program
         Trace.Assert(parsed.Assets[0].Name == "KMShare-v9.9.9-win-x64-installer.exe", "Asset name mismatch");
         Console.WriteLine("  -> Release JSON parsing & asset binding verified.");
 
+        // Standalone executable asset resolution test: Must always prefer standalone executable over installer
+        var sampleAssets = new List<GitHubReleaseAsset>
+        {
+            new("KMShare-v9.9.9-win-x64-installer.exe", 50000000, "https://example.com/installer", "", 1),
+            new("KMShare-v9.9.9-win-x64-portable.zip", 45000000, "https://example.com/zip", "", 2),
+            new("KMShare-v9.9.9-win-x64.exe", 40000000, "https://example.com/exe", "", 3),
+            new("KMShare-v9.9.9-linux-x64", 38000000, "https://example.com/linux", "", 4),
+            new("KMShare-v9.9.9-osx-arm64", 37000000, "https://example.com/mac", "", 5)
+        };
+
+        var resolvedWin = GitHubUpdateService.ResolveExecutableAsset(sampleAssets, OSPlatform.Windows);
+        Trace.Assert(resolvedWin != null && resolvedWin.Name == "KMShare-v9.9.9-win-x64.exe", "Windows must resolve standalone .exe over installer");
+
+        // When only installer and portable zip are available, must resolve portable zip (never installer)
+        var fallbackAssets = sampleAssets.Take(2).ToList();
+        var resolvedFallback = GitHubUpdateService.ResolveExecutableAsset(fallbackAssets, OSPlatform.Windows);
+        Trace.Assert(resolvedFallback != null && resolvedFallback.Name == "KMShare-v9.9.9-win-x64-portable.zip", "Windows fallback must resolve portable zip, not installer");
+
+        var resolvedLinux = GitHubUpdateService.ResolveExecutableAsset(sampleAssets, OSPlatform.Linux);
+        Trace.Assert(resolvedLinux != null && resolvedLinux.Name == "KMShare-v9.9.9-linux-x64", "Linux must resolve standalone binary");
+
+        var resolvedMac = GitHubUpdateService.ResolveExecutableAsset(sampleAssets, OSPlatform.OSX);
+        Trace.Assert(resolvedMac != null && resolvedMac.Name == "KMShare-v9.9.9-osx-arm64", "macOS must resolve standalone binary");
+        Console.WriteLine("  -> Standalone executable resolution logic verified across Windows, Linux and macOS.");
+
         Console.WriteLine("  [OK] Check 11 Passed.");
+    }
+
+    private static void CleanupPendingOldExecutable()
+    {
+        try
+        {
+            string? current = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(current))
+            {
+                string oldFile = current + ".old";
+                if (File.Exists(oldFile))
+                {
+                    File.Delete(oldFile);
+                }
+            }
+        }
+        catch { }
     }
 
     private const int WH_MOUSE_LL = 14;

@@ -194,14 +194,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-all.ps1 -Version "1.
 ```
 O script gera compilações Single-File Self-Contained prontas para uso em todos os sistemas operacionais, empacota portables e instaladores, calcula hashes criptográficos e executa a varredura profunda do **Microsoft Defender Antivirus**:
 - **Windows (`win-x64`)**:
+  - `dist/KMShare-v1.0.0-win-x64.exe` (Executável Standalone Direto / Sem Instalação)
   - `dist/KMShare-v1.0.0-win-x64-portable.zip` (Portable com `KMShare.exe` e `kmshare-updater.exe`)
   - `dist/KMShare-v1.0.0-win-x64-installer.exe` (Instalador Inno Setup no escopo `asInvoker` em `%LOCALAPPDATA%\Programs\KMShare`)
   - `dist/Install-KMShare.ps1` (Script instalador standalone User-Space)
 - **Linux (`linux-x64`)**:
+  - `dist/KMShare-v1.0.0-linux-x64` (Binário Standalone Direto / Sem Instalação)
   - `dist/KMShare-v1.0.0-linux-x64-portable.tar.gz` (Portable com executáveis e lançador)
   - `dist/KMShare-v1.0.0-linux-x64.deb` (Pacote Debian com atalho `.desktop` e ícone)
   - `dist/KMShare-v1.0.0-linux-x64-installer.sh` (Instalador standalone User-Space para qualquer distro)
 - **macOS (`osx-arm64` Apple Silicon)**:
+  - `dist/KMShare-v1.0.0-osx-arm64` (Binário Standalone Direto / Sem Instalação)
   - `dist/KMShare-v1.0.0-osx-arm64-portable.tar.gz` (Portable com executáveis)
   - `dist/KMShare-v1.0.0-osx-arm64-app.zip` (Pacote `KMShare.app` com `Info.plist` pronto para `Applications`)
   - `dist/KMShare-v1.0.0-osx-arm64-installer.sh` (Script instalador de integração com o sistema)
