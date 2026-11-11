@@ -1,6 +1,6 @@
-﻿param(
+param(
     [string]$Configuration = "Release",
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.0.1",
     [string[]]$Runtimes = @("win-x64", "linux-x64", "osx-arm64"),
     [switch]$PackageAll = $false,
     [switch]$ScanDefender = $false,

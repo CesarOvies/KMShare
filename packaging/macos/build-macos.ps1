@@ -1,7 +1,7 @@
 param(
     [string]$PublishDir = "$PSScriptRoot\..\..\publish\osx-arm64",
     [string]$OutputDir = "$PSScriptRoot\..\..\dist",
-    [string]$Version = "1.0.0"
+    [string]$Version = "1.0.1"
 )
 
 $ErrorActionPreference = "Stop"

@@ -25,7 +25,8 @@ public sealed record KMShareUserConfig(
     string LastTargetIp = "",
     string LastTargetBtMac = "",
     AppLanguage Language = AppLanguage.Auto,
-    AppTheme Theme = AppTheme.System)
+    AppTheme Theme = AppTheme.System,
+    string? GitHubToken = null)
 {
     public static KMShareUserConfig CreateDefault() => new(
         MonitorEdge: ScreenEdge.Right,
@@ -36,7 +37,8 @@ public sealed record KMShareUserConfig(
         LastTargetIp: "",
         LastTargetBtMac: "",
         Language: AppLanguage.Auto,
-        Theme: AppTheme.System);
+        Theme: AppTheme.System,
+        GitHubToken: null);
 }
 
 public static class TrayAndEdgeManager
@@ -98,7 +100,7 @@ public static class TrayAndEdgeManager
 
         return $"""
             =======================================================================
-            [KMShare — Painel de Controle & Bandeja do Sistema (100% User-Space)]
+            [KMShare v{AppVersionInfo.CurrentVersion} — Painel de Controle & Bandeja do Sistema (100% User-Space)]
               Status de Transporte:   {transportLabel}
               Borda Ativa do Monitor: {config.MonitorEdge} (Cruza p/ {EdgeCoordinateMapper.GetOppositeEdge(config.MonitorEdge)} no Peer)
               Modo VPN Preferido:     {config.PreferredVpnMode}
@@ -379,7 +381,7 @@ public static class TrayAndEdgeManager
         try
         {
             return new WindowsSystemTrayBadge(
-                $"KMShare | Edge:{config.MonitorEdge} | PIN:{config.PairingPin} | [F12] Emergência");
+                $"KMShare v{AppVersionInfo.CurrentVersion} | Edge:{config.MonitorEdge} | PIN:{config.PairingPin} | [F12] Emergência");
         }
         catch
         {

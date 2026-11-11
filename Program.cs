@@ -141,6 +141,45 @@ internal static class Program
                     await RunSystemIntegrityVerificationSuiteAsync(interactiveAuth);
                     return 0;
                 }
+                case "--version" or "-v":
+                {
+                    Console.WriteLine($"KMShare v{AppVersionInfo.CurrentVersion}");
+                    return 0;
+                }
+                case "--check-update":
+                {
+                    Console.WriteLine($"[KMShare] Versão atual: v{AppVersionInfo.CurrentVersion}");
+                    Console.WriteLine("[KMShare] Verificando atualizações no GitHub...");
+                    var cfg = TrayAndEdgeManager.LoadOrCreateConfig();
+                    var res = await GitHubUpdateService.CheckForUpdatesAsync(cfg, cts.Token);
+                    if (res.HasUpdate)
+                    {
+                        Console.WriteLine($"[KMShare] ⚡ Nova versão disponível: v{res.LatestVersion} (atual: v{res.CurrentVersion})");
+                        Console.WriteLine($"[KMShare] URL do Release: {res.ReleaseUrl}");
+                        Console.WriteLine("[KMShare] Para atualizar automaticamente, execute: KMShare.exe --update");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[KMShare] KMShare está na versão mais recente (v{res.CurrentVersion}).");
+                    }
+                    return 0;
+                }
+                case "--update":
+                {
+                    Console.WriteLine($"[KMShare] Versão atual: v{AppVersionInfo.CurrentVersion}");
+                    Console.WriteLine("[KMShare] Verificando atualizações no GitHub...");
+                    var cfg = TrayAndEdgeManager.LoadOrCreateConfig();
+                    var res = await GitHubUpdateService.CheckForUpdatesAsync(cfg, cts.Token);
+                    if (!res.HasUpdate)
+                    {
+                        Console.WriteLine($"[KMShare] KMShare já está na versão mais recente (v{res.CurrentVersion}).");
+                        return 0;
+                    }
+
+                    Console.WriteLine($"[KMShare] ⚡ Baixando e aplicando atualização v{res.LatestVersion}...");
+                    bool ok = await GitHubUpdateService.DownloadAndApplyUpdateAsync(res, cfg, msg => Console.WriteLine($"  -> {msg}"), cts.Token);
+                    return ok ? 0 : 1;
+                }
             }
         }
 
@@ -163,7 +202,7 @@ internal static class Program
 
     public static async Task RunSystemIntegrityVerificationSuiteAsync(bool interactiveAuth)
     {
-        Console.WriteLine("=== KMShare — Suíte de Verificação de Segurança e Integridade ===\n");
+        Console.WriteLine($"=== KMShare v{AppVersionInfo.CurrentVersion} — Suíte de Verificação de Segurança e Integridade ===\n");
         PrintCliUsageBanner();
 
         VerifyZeroPrivilegeAndUserInput();
@@ -177,6 +216,7 @@ internal static class Program
         await VerifyEndToEndSecureFileChannelAsync();
         await VerifyZeroAdminTrayAndAutostartAsync();
         await VerifyIntranetIsolationAndSignedUpdaterAsync();
+        VerifyGitHubUpdateServiceAndVersioning();
 
         Console.WriteLine("\n=== TODAS AS VERIFICAÇÕES DE INTEGRIDADE E SEGURANÇA PASSARAM ===");
     }
@@ -188,7 +228,7 @@ internal static class Program
         string lanIp = nics.Count > 0 ? nics[0].Ipv4Address.ToString() : "N/A";
 
         Console.WriteLine("-----------------------------------------------------------------------");
-        Console.WriteLine($"[Identificação desta Máquina] LAN Física: {lanIp} | Bluetooth MAC: {btMac}");
+        Console.WriteLine($"[Identificação desta Máquina] KMShare v{AppVersionInfo.CurrentVersion} | LAN Física: {lanIp} | Bluetooth MAC: {btMac}");
         Console.WriteLine("Comandos de operação do KMShare:");
         Console.WriteLine("  0. Interface Gráfica (GUI) e Descoberta Automática na Rede:");
         Console.WriteLine("     Interface Gráfica (Padrão):   KMShare.exe --gui");
@@ -203,6 +243,10 @@ internal static class Program
         Console.WriteLine("     Menu Console Interativo:      KMShare.exe --cli");
         Console.WriteLine("     Enviar Arquivo (Step-Up):     KMShare.exe --send-file <IP-DO-RECEPTOR> <ARQUIVO> 839201");
         Console.WriteLine("     Suíte de Autoteste:           KMShare.exe --self-test");
+        Console.WriteLine("  4. Atualização e Versão:");
+        Console.WriteLine("     Checar Atualizações no GitHub: KMShare.exe --check-update");
+        Console.WriteLine("     Atualizar para Última Versão:  KMShare.exe --update");
+        Console.WriteLine("     Exibir Versão Atual:           KMShare.exe --version");
         Console.WriteLine("-----------------------------------------------------------------------\n");
     }
 
@@ -768,6 +812,48 @@ internal static class Program
         }
 
         Console.WriteLine("  [OK] Check 10 Passed.");
+    }
+
+    private static void VerifyGitHubUpdateServiceAndVersioning()
+    {
+        Console.WriteLine("\n[Check 11] GitHub Update Service & Versioning Verification");
+
+        string curVer = AppVersionInfo.CurrentVersion;
+        Trace.Assert(!string.IsNullOrWhiteSpace(curVer), "AppVersionInfo.CurrentVersion must not be empty");
+        Console.WriteLine($"  -> Current Version resolved: v{curVer}");
+
+        Trace.Assert(GitHubUpdateService.IsVersionNewer("1.0.2", "1.0.1"), "1.0.2 must be newer than 1.0.1");
+        Trace.Assert(GitHubUpdateService.IsVersionNewer("v2.0.0", "1.9.9"), "v2.0.0 must be newer than 1.9.9");
+        Trace.Assert(!GitHubUpdateService.IsVersionNewer("1.0.1", "1.0.1"), "1.0.1 must not be newer than 1.0.1");
+        Trace.Assert(!GitHubUpdateService.IsVersionNewer("v1.0.0", "1.0.1"), "v1.0.0 must not be newer than 1.0.1");
+        Console.WriteLine("  -> SemVer comparison logic verified.");
+
+        string sampleJson = """
+            {
+              "tag_name": "v9.9.9",
+              "html_url": "https://github.com/CesarOvies/KMShare/releases/tag/v9.9.9",
+              "body": "Test release notes",
+              "assets": [
+                {
+                  "id": 12345,
+                  "name": "KMShare-v9.9.9-win-x64-installer.exe",
+                  "size": 52428800,
+                  "browser_download_url": "https://github.com/CesarOvies/KMShare/releases/download/v9.9.9/KMShare-v9.9.9-win-x64-installer.exe",
+                  "url": "https://api.github.com/repos/CesarOvies/KMShare/releases/assets/12345"
+                }
+              ]
+            }
+            """;
+
+        var parsed = GitHubUpdateService.ParseReleaseJson(sampleJson, curVer);
+        Trace.Assert(parsed != null, "Parsed result must not be null");
+        Trace.Assert(parsed!.HasUpdate, "Must report update available for v9.9.9");
+        Trace.Assert(parsed.LatestVersion == "9.9.9", "LatestVersion must be 9.9.9");
+        Trace.Assert(parsed.Assets.Count == 1, "Must contain 1 asset");
+        Trace.Assert(parsed.Assets[0].Name == "KMShare-v9.9.9-win-x64-installer.exe", "Asset name mismatch");
+        Console.WriteLine("  -> Release JSON parsing & asset binding verified.");
+
+        Console.WriteLine("  [OK] Check 11 Passed.");
     }
 
     private const int WH_MOUSE_LL = 14;
