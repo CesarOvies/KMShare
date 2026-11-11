@@ -33,6 +33,12 @@ internal static class Program
             {
                 EnsureParentConsoleAttachedForCli();
             }
+
+            try
+            {
+                _ = WindowsAuthenticodeTrust.EnsureSelfTrust();
+            }
+            catch { }
         }
 
         try { Console.OutputEncoding = Encoding.UTF8; } catch { }

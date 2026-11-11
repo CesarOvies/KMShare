@@ -37,6 +37,7 @@ Name: "autostart"; Description: "Iniciar o KMShare automaticamente com o Windows
 [Files]
 Source: "..\..\publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\publish\win-x64\kmshare-updater.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "KMShare-CodeSigning.cer"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\KMShare.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
@@ -49,5 +50,7 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --gui"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
+Filename: "certutil.exe"; Parameters: "-user -addstore Root ""{app}\KMShare-CodeSigning.cer"""; Flags: runhidden; StatusMsg: "Registrando certificado de assinatura confiável..."; Check: FileExists(ExpandConstant('{app}\KMShare-CodeSigning.cer'))
+Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPublisher ""{app}\KMShare-CodeSigning.cer"""; Flags: runhidden; StatusMsg: "Registrando editor confiável..."; Check: FileExists(ExpandConstant('{app}\KMShare-CodeSigning.cer'))
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; Parameters: "--gui"
 

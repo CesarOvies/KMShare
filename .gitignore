@@ -37,6 +37,7 @@ bld/
 *.pem
 *.key
 *.cer
+!packaging/windows/KMShare-CodeSigning.cer
 *.crt
 *.secret
 config.json

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Configuration = "Release",
     [string]$Version = "1.0.0",
     [string[]]$Runtimes = @("win-x64", "linux-x64", "osx-arm64"),
@@ -45,6 +45,51 @@ foreach ($rid in $Runtimes) {
     Write-Host "  -> Concluido com sucesso para $rid" -ForegroundColor Green
 }
 
+# Assinatura de código Windows (se certificado fornecido via env)
+$certPfxBase64 = $env:CERT_BASE64
+$certPass = $env:CERT_PASS
+if ($Runtimes -contains "win-x64" -and -not [string]::IsNullOrWhiteSpace($certPfxBase64) -and -not [string]::IsNullOrWhiteSpace($certPass)) {
+    Write-Host "`n--- Assinando binarios do Windows (win-x64) ---" -ForegroundColor Cyan
+    $winPub = Join-Path $publishBase "win-x64"
+    $kmshareExe = Join-Path $winPub "KMShare.exe"
+    $updaterExe = Join-Path $winPub "kmshare-updater.exe"
+
+    $tempPfx = Join-Path ([System.IO.Path]::GetTempPath()) "kmshare_cert_$([System.Guid]::NewGuid().ToString('N')).pfx"
+    try {
+        [System.IO.File]::WriteAllBytes($tempPfx, [Convert]::FromBase64String($certPfxBase64))
+        
+        $publicCerPath = Join-Path $PSScriptRoot "packaging\windows\KMShare-CodeSigning.cer"
+        if (-not (Test-Path $publicCerPath)) {
+            $pfxCert = [System.Security.Cryptography.X509Certificates.X509CertificateLoader]::LoadPkcs12FromFile($tempPfx, $certPass)
+            [System.IO.File]::WriteAllBytes($publicCerPath, $pfxCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+        }
+
+        $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+        if (-not $signtool) {
+            $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending |
+                Select-Object -ExpandProperty FullName -First 1
+        }
+
+        foreach ($targetExe in @($kmshareExe, $updaterExe)) {
+            if (Test-Path $targetExe) {
+                if ($signtool) {
+                    & $signtool sign /f $tempPfx /p $certPass /fd SHA256 /tr "http://timestamp.digicert.com" /td SHA256 /d "KMShare" /du "https://github.com/CesarOvies/KMShare" $targetExe
+                } else {
+                    $securePass = ConvertTo-SecureString -String $certPass -Force -AsPlainText
+                    $cert = Import-PfxCertificate -FilePath $tempPfx -CertStoreLocation "Cert:\CurrentUser\My" -Password $securePass
+                    $null = Set-AuthenticodeSignature -FilePath $targetExe -Certificate $cert -HashAlgorithm SHA256 -TimestampServer "http://timestamp.digicert.com"
+                }
+                Write-Host "  -> Assinado: $(Split-Path $targetExe -Leaf)" -ForegroundColor Green
+            }
+        }
+    } catch {
+        Write-Warning "Falha ao assinar binarios: $_"
+    } finally {
+        Remove-Item $tempPfx -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # 2. Empacotamento de Portables e Instaladores (se solicitado)
 if ($PackageAll) {
     Write-Host "`n[2/3] Gerando pacotes de distribuicao (Portables e Instaladores)..." -ForegroundColor Yellow
@@ -68,6 +113,12 @@ if ($PackageAll) {
         Copy-Item "$PSScriptRoot\README.md" $winTemp -Force
         Copy-Item "$PSScriptRoot\LICENSE" $winTemp -Force
         Copy-Item "$PSScriptRoot\packaging\windows\Install-KMShare.ps1" $winTemp -Force
+
+        $certSrc = "$PSScriptRoot\packaging\windows\KMShare-CodeSigning.cer"
+        if (Test-Path $certSrc) {
+            Copy-Item $certSrc $winTemp -Force
+            Copy-Item $certSrc (Join-Path $distBase "KMShare-CodeSigning.cer") -Force
+        }
 
         Compress-Archive -Path "$winTemp\*" -DestinationPath $winZipPath -Force
         Remove-Item -Path $winTemp -Recurse -Force -ErrorAction SilentlyContinue

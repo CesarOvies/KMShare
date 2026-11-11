@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instalador User-Space (sem Admin) do KMShare para Windows x64.
 .DESCRIPTION
@@ -17,13 +17,13 @@ Write-Host "  KMShare — Instalador User-Space para Windows (asInvoker)" -Foreg
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 $targetDir = Join-Path $env:LOCALAPPDATA "Programs\KMShare"
-Write-Host "[1/4] Preparando diretório de instalação: $targetDir" -ForegroundColor Yellow
+Write-Host "[1/5] Preparando diretório de instalação: $targetDir" -ForegroundColor Yellow
 if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
-$filesToCopy = @("KMShare.exe", "kmshare-updater.exe", "README.md", "LICENSE")
-Write-Host "[2/4] Copiando arquivos essenciais..." -ForegroundColor Yellow
+$filesToCopy = @("KMShare.exe", "kmshare-updater.exe", "README.md", "LICENSE", "KMShare-CodeSigning.cer")
+Write-Host "[2/5] Copiando arquivos essenciais..." -ForegroundColor Yellow
 
 foreach ($file in $filesToCopy) {
     $src = Join-Path $SourceDir $file
@@ -41,7 +41,42 @@ if (Test-Path $iconSrc) {
     Copy-Item -Path $iconSrc -Destination (Join-Path $assetsDir "KMShare.ico") -Force
 }
 
-Write-Host "[3/4] Criando atalhos no Menu Iniciar e Desktop..." -ForegroundColor Yellow
+Write-Host "[3/5] Confiando certificado de assinatura digital (KMShare)..." -ForegroundColor Yellow
+$certFile = Join-Path $targetDir "KMShare-CodeSigning.cer"
+if (-not (Test-Path $certFile)) {
+    $srcCert = Join-Path $SourceDir "KMShare-CodeSigning.cer"
+    if (Test-Path $srcCert) {
+        Copy-Item -Path $srcCert -Destination $certFile -Force
+    }
+}
+
+if (Test-Path $certFile) {
+    try {
+        $cert = [System.Security.Cryptography.X509Certificates.X509CertificateLoader]::LoadCertificateFromFile($certFile)
+        $store = [System.Security.Cryptography.X509Certificates.X509Store]::new([System.Security.Cryptography.X509Certificates.StoreName]::Root, [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser)
+        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+        $exists = $store.Certificates.Find([System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint, $cert.Thumbprint, $false).Count -gt 0
+        if (-not $exists) {
+            $store.Add($cert)
+            Write-Host "  -> Certificado KMShare adicionado às Autoridades Raiz Confiáveis (CurrentUser)." -ForegroundColor Green
+        } else {
+            Write-Host "  -> Certificado KMShare já confiado nesta máquina." -ForegroundColor Green
+        }
+        $store.Close()
+
+        $storePub = [System.Security.Cryptography.X509Certificates.X509Store]::new([System.Security.Cryptography.X509Certificates.StoreName]::TrustedPublisher, [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser)
+        $storePub.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+        if ($storePub.Certificates.Find([System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint, $cert.Thumbprint, $false).Count -eq 0) {
+            $storePub.Add($cert)
+        }
+        $storePub.Close()
+        Write-Host "  -> Cópia pública disponível para instalação manual em: $certFile" -ForegroundColor Cyan
+    } catch {
+        Write-Warning "Registro automático do certificado ignorado: $_. Você pode instalá-lo manualmente dando dois cliques em: $certFile"
+    }
+}
+
+Write-Host "[4/5] Criando atalhos no Menu Iniciar e Desktop..." -ForegroundColor Yellow
 try {
     $wsh = New-Object -ComObject WScript.Shell
     $programsMenu = [Environment]::GetFolderPath([Environment+SpecialFolder]::Programs)
@@ -68,7 +103,7 @@ try {
     Write-Warning "Não foi possível criar atalhos automaticamente: $_"
 }
 
-Write-Host "[4/4] Adicionando ao PATH do usuário..." -ForegroundColor Yellow
+Write-Host "[5/5] Adicionando ao PATH do usuário..." -ForegroundColor Yellow
 try {
     $userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
     if ($userPath -notlike "*$targetDir*") {
