@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Configuration = "Release",
     [string]$Version = "1.0.1",
     [string[]]$Runtimes = @("win-x64", "linux-x64", "osx-arm64"),
@@ -112,7 +112,6 @@ if ($PackageAll) {
         Copy-Item (Join-Path $winPub "kmshare-updater.exe") $winTemp -Force
         Copy-Item "$PSScriptRoot\README.md" $winTemp -Force
         Copy-Item "$PSScriptRoot\LICENSE" $winTemp -Force
-        Copy-Item "$PSScriptRoot\packaging\windows\Install-KMShare.ps1" $winTemp -Force
 
         $certSrc = "$PSScriptRoot\packaging\windows\KMShare-CodeSigning.cer"
         if (Test-Path $certSrc) {
