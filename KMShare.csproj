@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>KMShare</AssemblyName>
+    <RootNamespace>KMShare</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\KMShare.ico</ApplicationIcon>
+    <DefaultItemExcludes>$(DefaultItemExcludes);updater\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

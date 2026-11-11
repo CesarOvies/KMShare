@@ -1,0 +1,63 @@
+# ==============================================================================
+# KMShare - .gitignore
+# ==============================================================================
+
+# Build & Compilation outputs
+[Bb]in/
+[Oo]bj/
+dist/
+publish/
+out/
+bld/
+
+# MSBuild / Visual Studio temporary files & caches
+.vs/
+*.user
+*.userosv
+*.suo
+*.userprefs
+*.sln.docstates
+*.dbmdl
+*.sln.iml
+
+# Visual Studio Code (preserve team launch & task configurations)
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.iws
+
+# Sensitive data, credentials and local configuration
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.secret
+config.json
+
+# KMShare Runtime & File Transfer partials
+*.part
+*.dmp
+crash.dmp
+*.log
+*.tmp
+*~
+*.swp
+
+# OS generated files
+.claude-flow/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
