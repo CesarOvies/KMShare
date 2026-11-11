@@ -115,7 +115,6 @@ if ($PackageAll) {
 
         $certSrc = "$PSScriptRoot\packaging\windows\KMShare-CodeSigning.cer"
         if (Test-Path $certSrc) {
-            Copy-Item $certSrc $winTemp -Force
             Copy-Item $certSrc (Join-Path $distBase "KMShare-CodeSigning.cer") -Force
         }
 
