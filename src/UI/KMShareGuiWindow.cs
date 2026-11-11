@@ -448,6 +448,8 @@ public static partial class KMShareGuiWindow
             }
             finally
             {
+                GC.KeepAlive(_buttonSubclasses);
+                GC.KeepAlive(this);
                 hid.OnRemoteStateChanged -= remoteStateSubscriber;
                 StopActiveSession();
             }
@@ -2174,6 +2176,7 @@ public static partial class KMShareGuiWindow
             DeleteIfValid(_brushCardBg);
             DeleteIfValid(_brushEditBg);
             DeleteIfValid(_brushLogBg);
+            _buttonSubclasses.Clear();
             GC.SuppressFinalize(this);
         }
 
