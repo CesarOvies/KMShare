@@ -400,6 +400,18 @@ public static class TrayAndEdgeManager
     private static extern int RegOpenKeyExW(IntPtr hKey, string lpSubKey, uint ulOptions, int samDesired, out IntPtr phkResult);
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int RegCreateKeyExW(
+        IntPtr hKey,
+        string lpSubKey,
+        uint Reserved,
+        string? lpClass,
+        uint dwOptions,
+        int samDesired,
+        IntPtr lpSecurityAttributes,
+        out IntPtr phkResult,
+        out uint lpdwDisposition);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
     private static extern int RegSetValueExW(IntPtr hKey, string lpValueName, uint Reserved, uint dwType, byte[] lpData, int cbData);
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
@@ -413,7 +425,7 @@ public static class TrayAndEdgeManager
 
     private static bool SetWindowsHkcuRunEntry(string valueName, string? commandLine)
     {
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, RunSubKey, 0, KEY_WRITE, out IntPtr hKey) != 0)
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, RunSubKey, 0, null, 0, KEY_WRITE, IntPtr.Zero, out IntPtr hKey, out _) != 0)
             return false;
 
         try

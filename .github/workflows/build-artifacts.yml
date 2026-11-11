@@ -44,7 +44,7 @@ jobs:
       - name: Compile & Package All Multiplatform Installers and Portables
         shell: pwsh
         run: |
-          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $shortSha = if ($env:GITHUB_SHA) { $env:GITHUB_SHA.Substring(0, [Math]::Min(7, $env:GITHUB_SHA.Length)) } else { "dev" }
           $buildVersion = "1.0.0-dev.$shortSha"
           & .\build-all.ps1 `
             -Version $buildVersion `

@@ -84,10 +84,10 @@ jobs:
           dotnet build updater/KMShare.Updater/KMShare.Updater.csproj -c Release -r osx-arm64
 
       - name: Run KMShare Core Security & Integrity Self-Test
-        run: dotnet run --project KMShare.csproj -c Release --no-build -- --self-test
+        run: dotnet run --project KMShare.csproj -c Release -- --self-test
 
       - name: Run KMShare.Updater Cryptographic Verification Self-Test
-        run: dotnet run --project updater/KMShare.Updater/KMShare.Updater.csproj -c Release --no-build -- --self-test
+        run: dotnet run --project updater/KMShare.Updater/KMShare.Updater.csproj -c Release -- --self-test
 
       - name: Auto-close PR if build or security self-test fails
         if: failure() && github.event_name == 'pull_request'
