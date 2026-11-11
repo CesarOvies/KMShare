@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Instalador User-Space (sem Admin) do KMShare para Windows x64.
 .DESCRIPTION
@@ -41,7 +41,7 @@ if (Test-Path $iconSrc) {
     Copy-Item -Path $iconSrc -Destination (Join-Path $assetsDir "KMShare.ico") -Force
 }
 
-Write-Host "[3/5] Confiando certificado de assinatura digital (KMShare)..." -ForegroundColor Yellow
+Write-Host "[3/5] Disponibilizando certificado de assinatura digital..." -ForegroundColor Yellow
 $certFile = Join-Path $targetDir "KMShare-CodeSigning.cer"
 if (-not (Test-Path $certFile)) {
     $srcCert = Join-Path $SourceDir "KMShare-CodeSigning.cer"
@@ -49,31 +49,8 @@ if (-not (Test-Path $certFile)) {
         Copy-Item -Path $srcCert -Destination $certFile -Force
     }
 }
-
 if (Test-Path $certFile) {
-    try {
-        $cert = [System.Security.Cryptography.X509Certificates.X509CertificateLoader]::LoadCertificateFromFile($certFile)
-        $store = [System.Security.Cryptography.X509Certificates.X509Store]::new([System.Security.Cryptography.X509Certificates.StoreName]::Root, [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser)
-        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        $exists = $store.Certificates.Find([System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint, $cert.Thumbprint, $false).Count -gt 0
-        if (-not $exists) {
-            $store.Add($cert)
-            Write-Host "  -> Certificado KMShare adicionado às Autoridades Raiz Confiáveis (CurrentUser)." -ForegroundColor Green
-        } else {
-            Write-Host "  -> Certificado KMShare já confiado nesta máquina." -ForegroundColor Green
-        }
-        $store.Close()
-
-        $storePub = [System.Security.Cryptography.X509Certificates.X509Store]::new([System.Security.Cryptography.X509Certificates.StoreName]::TrustedPublisher, [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser)
-        $storePub.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        if ($storePub.Certificates.Find([System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint, $cert.Thumbprint, $false).Count -eq 0) {
-            $storePub.Add($cert)
-        }
-        $storePub.Close()
-        Write-Host "  -> Cópia pública disponível para instalação manual em: $certFile" -ForegroundColor Cyan
-    } catch {
-        Write-Warning "Registro automático do certificado ignorado: $_. Você pode instalá-lo manualmente dando dois cliques em: $certFile"
-    }
+    Write-Host "  -> Certificado disponível em: $certFile (instalação manual opcional)." -ForegroundColor Cyan
 }
 
 Write-Host "[4/5] Criando atalhos no Menu Iniciar e Desktop..." -ForegroundColor Yellow

@@ -1,20 +1,20 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 
 namespace KMShare.Security;
 
 /// <summary>
-/// Gerencia a auto-verificação e instalação segura da chave pública do certificado de assinatura
-/// de código do KMShare no repositório de Usuário do Windows (CurrentUser\Root e CurrentUser\TrustedPublisher).
+/// Gerencia a auto-verificação da assinatura de código do KMShare e disponibilização da chave pública (.cer)
+/// para instalação manual opcional no escopo do Usuário, sem forçar injeção no repositório de certificados do Windows.
 /// </summary>
 public static class WindowsAuthenticodeTrust
 {
     public const string PublicCertFileName = "KMShare-CodeSigning.cer";
 
     /// <summary>
-    /// Garante que o certificado com o qual este binário foi assinado esteja confiado
-    /// no escopo do usuário atual, evitando avisos futuros do SmartScreen e do UAC em atualizações.
-    /// Também garante que uma cópia pública (.cer) esteja disponível na pasta para instalação manual.
+    /// Verifica se o binário está assinado, disponibiliza a chave pública (.cer) ao lado do executável
+    /// para instalação manual opcional e verifica se o certificado já é confiado no escopo do usuário (somente leitura).
+    /// Não realiza injeção forçada de certificados no repositório do Windows para evitar alertas de segurança (Sigma / EDR).
     /// </summary>
     public static bool EnsureSelfTrust(Action<string>? logAction = null)
     {
@@ -50,10 +50,10 @@ public static class WindowsAuthenticodeTrust
 
         using (cert)
         {
-            // 1. Sempre disponibiliza a cópia da chave pública (.cer) ao lado do executável para instalação manual
+            // 1. Sempre disponibiliza a cópia da chave pública (.cer) ao lado do executável para instalação manual opcional
             TryEnsurePublicCertFile(exePath, cert, logAction);
 
-            // 2. Verifica se o certificado já é confiado na raiz do usuário atual
+            // 2. Apenas verifica se o certificado já é confiado na raiz do usuário atual (somente leitura)
             try
             {
                 using var readRootStore = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
@@ -63,39 +63,13 @@ public static class WindowsAuthenticodeTrust
 
                 if (alreadyTrusted)
                 {
+                    logAction?.Invoke($"[Certificado] KMShare ({cert.Subject}) já é confiado no sistema.");
                     return true;
                 }
             }
             catch { }
 
-            // 3. Adiciona o certificado às Autoridades Raiz e Editores Confiáveis do Usuário
-            try
-            {
-                using (var writeRootStore = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
-                {
-                    writeRootStore.Open(OpenFlags.ReadWrite);
-                    writeRootStore.Add(cert);
-                    writeRootStore.Close();
-                }
-
-                using (var pubStore = new X509Store(StoreName.TrustedPublisher, StoreLocation.CurrentUser))
-                {
-                    pubStore.Open(OpenFlags.ReadWrite);
-                    if (pubStore.Certificates.Find(X509FindType.FindByThumbprint, cert.Thumbprint, false).Count == 0)
-                    {
-                        pubStore.Add(cert);
-                    }
-                    pubStore.Close();
-                }
-
-                logAction?.Invoke($"[Certificado] KMShare ({cert.Subject}) registrado como confiável no Windows.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                logAction?.Invoke($"[Certificado] Auto-confirmação do certificado ignorada ou recusada: {ex.Message}");
-                return false;
-            }
+            return false;
         }
     }
 
