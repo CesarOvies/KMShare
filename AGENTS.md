@@ -62,3 +62,40 @@ dotnet build updater\KMShare.Updater\KMShare.Updater.csproj
 dotnet run --project KMShare.csproj -- --self-test
 ```
 
+---
+
+## 4. Política de Branches e CI/CD (Padrão Gitflow / GitCommitMigrator)
+
+O repositório adota a mesma segmentação e política estrita do projeto **GitCommitMigrator**:
+
+1. **Branches Principais:**
+   - **`main`**: Branch de produção e releases oficiais. Recebe Pull Requests **exclusivamente** vindos de `develop`. Qualquer PR externo aberto diretamente contra `main` é automaticamente fechado pela action `ci.yml`.
+   - **`develop`**: Branch de integração contínua. Toda nova feature ou correção deve ser ramificada a partir de `develop` (`feature/...`, `fix/...`) e submetida via Pull Request apontando para `develop`.
+2. **Sincronização e Proteção (`sync-develop.yml`):**
+   - Ao publicar um release na `main`, a action sincroniza automaticamente o merge de `main` em `develop`.
+   - A exclusão acidental da branch `develop` é bloqueada e restaurada imediatamente.
+3. **Template de Pull Request (`.github/pull_request_template.md`):**
+   - Todo PR deve detalhar descrição, tipo de mudança, principais alterações técnicas, checklist de testes e assinatura da IA responsável.
+
+---
+
+## 5. Rotina de Compilação Automatizada, Empacotamento e Varredura Antivírus
+
+1. **Compilação Multiplataforma (`build-all.ps1`):**
+   - Gera binários Single-File Self-Contained para `win-x64`, `linux-x64` e `osx-arm64`.
+2. **Matriz de Pacotes Disponíveis:**
+   - **Windows (`win-x64`)**:
+     - *Portable*: `KMShare-v<version>-win-x64-portable.zip`
+     - *Instalador*: `KMShare-v<version>-win-x64-installer.exe` (Inno Setup no escopo `asInvoker` / `PrivilegesRequired=lowest` em `%LOCALAPPDATA%\Programs\KMShare`) e script standalone `Install-KMShare.ps1`.
+   - **Linux (`linux-x64`)**:
+     - *Portable*: `KMShare-v<version>-linux-x64-portable.tar.gz`
+     - *Instalador*: Pacote Debian `KMShare-v<version>-linux-x64.deb` e script instalador User-Space `KMShare-v<version>-linux-x64-installer.sh`.
+   - **macOS (`osx-arm64` Apple Silicon)**:
+     - *Portable*: `KMShare-v<version>-osx-arm64-portable.tar.gz`
+     - *Instalador*: Pacote App Bundle `KMShare-v<version>-osx-arm64-app.zip` (`KMShare.app` com `Info.plist`) e script standalone `KMShare-v<version>-osx-arm64-installer.sh`.
+3. **Segurança Obrigatória e Scan Microsoft Defender:**
+   - Todo release e build contínuo executa varredura profunda no diretório `dist/` com `MpCmdRun.exe -Scan -ScanType 3 -File <dist>`.
+   - 0 ameaças detectadas é requisito mandatório para prosseguir com o release.
+   - Geração de hashes criptográficos SHA-256 e SHA-512, integração com VirusTotal API v3 e SLSA Build Provenance Attestation via GitHub Actions.
+
+

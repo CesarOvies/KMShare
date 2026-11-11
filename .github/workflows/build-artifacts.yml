@@ -1,0 +1,75 @@
+name: Continuous Build & Nightly Artifacts
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-and-package:
+    name: Build All Binaries & Upload Git Artifacts
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Inno Setup Compiler
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            Write-Host "Instalando Inno Setup via Chocolatey..."
+            choco install innosetup --no-progress -y
+            $innoPath = "${env:ProgramFiles(x86)}\Inno Setup 6"
+            if (Test-Path $innoPath) {
+              echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Append
+            }
+          }
+
+      - name: Run Core Security Self-Tests
+        run: |
+          dotnet run --project KMShare.csproj -c Release -- --self-test
+          dotnet run --project updater/KMShare.Updater/KMShare.Updater.csproj -c Release -- --self-test
+
+      - name: Compile & Package All Multiplatform Installers and Portables
+        shell: pwsh
+        run: |
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $buildVersion = "1.0.0-dev.$shortSha"
+          powershell -ExecutionPolicy Bypass -File .\build-all.ps1 `
+            -Version $buildVersion `
+            -Configuration Release `
+            -PackageAll `
+            -SelfContained $true
+
+      - name: Scan All Packages with Microsoft Defender Antivirus
+        shell: pwsh
+        run: |
+          $mpCmdRun = "$env:ProgramFiles\Windows Defender\MpCmdRun.exe"
+          $fullPath = (Resolve-Path ./dist).Path
+          if (Test-Path $mpCmdRun) {
+            Write-Host "Executando Microsoft Defender Antivirus no diretório de distribuição..."
+            & $mpCmdRun -Scan -ScanType 3 -File $fullPath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Microsoft Defender detectou ameaça de segurança nos binários! Código: $LASTEXITCODE"
+            }
+            Write-Host "✅ Microsoft Defender Antivirus: 0 ameaças detectadas em todos os binários!" -ForegroundColor Green
+          }
+
+      - name: Upload All Release Artifacts to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: KMShare-Development-Builds
+          path: dist/
+          retention-days: 14
+

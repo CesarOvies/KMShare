@@ -1,0 +1,269 @@
+name: Release & Package Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release-and-deploy:
+    name: Build Multiplatform Portables, Installers, Defender Scan & Publish Release
+    runs-on: windows-latest
+    env:
+      SECRET_CERT_BASE64: CERT_PFX_BASE64
+      SECRET_CERT_PASS: CERT_PASSWORD
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Inno Setup Compiler
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            Write-Host "Instalando Inno Setup via Chocolatey..."
+            choco install innosetup --no-progress -y
+            $innoPath = "${env:ProgramFiles(x86)}\Inno Setup 6"
+            if (Test-Path $innoPath) {
+              echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Append
+            }
+          }
+
+      - name: Calculate Next Semantic Version & Tag
+        id: version
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+          $latestTag = git tag --list "v*" --sort=-v:refname | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($latestTag)) {
+            $nextVersion = "1.0.0"
+          } else {
+            $ver = $latestTag.TrimStart('v') -split '\.'
+            $major = [int]$ver[0]
+            $minor = [int]$ver[1]
+            $patch = [int]$ver[2] + 1
+            $nextVersion = "$major.$minor.$patch"
+          }
+          $tagName = "v$nextVersion"
+          "version=$nextVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tagName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Próxima versão de release: $tagName ($nextVersion)"
+
+      - name: Run Pre-Release Security & Integrity Self-Tests
+        run: |
+          dotnet run --project KMShare.csproj -c Release -- --self-test
+          dotnet run --project updater/KMShare.Updater/KMShare.Updater.csproj -c Release -- --self-test
+
+      - name: Sign Binaries (if certificate configured)
+        env:
+          CERT_BASE64: ${{ secrets[env.SECRET_CERT_BASE64] }}
+          CERT_PASS: ${{ secrets[env.SECRET_CERT_PASS] }}
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:CERT_BASE64) -and -not [string]::IsNullOrWhiteSpace($env:CERT_PASS)) {
+            Write-Host "Certificado de assinatura digital encontrado."
+            # O build-all.ps1 publicará e assinará antes do empacotamento
+          } else {
+            Write-Host "Secrets CERT_PFX_BASE64 / CERT_PASSWORD não configuradas. Prosseguindo com binários padrão."
+          }
+
+      - name: Compile and Package All Portables and Installers
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\build-all.ps1 `
+            -Version $env:VERSION `
+            -Configuration Release `
+            -PackageAll `
+            -SelfContained $true
+
+      - name: Scan All Binaries, Installers & Packages with Microsoft Defender Antivirus
+        id: defender_scan
+        shell: pwsh
+        run: |
+          $mpCmdRun = "$env:ProgramFiles\Windows Defender\MpCmdRun.exe"
+          $fullPath = (Resolve-Path ./dist).Path
+          if (Test-Path $mpCmdRun) {
+            Write-Host "Executando Microsoft Defender Antivirus em $fullPath..."
+            & $mpCmdRun -Scan -ScanType 3 -File $fullPath
+            if ($LASTEXITCODE -eq 0) {
+              $status = "✅ Limpo (0 ameaças detectadas pelo Microsoft Defender Antivirus em todos os executáveis, instaladores e pacotes)"
+              "defender_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+              Write-Host $status
+            } else {
+              throw "Microsoft Defender detectou ameaça ou falha no scan (ExitCode: $LASTEXITCODE)"
+            }
+          } else {
+            "defender_status=ℹ️ Scanner local indisponível no runner" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: VirusTotal Scan & Analysis Link
+        id: virustotal
+        env:
+          VT_API_KEY: ${{ secrets['VT_API_KEY'] }}
+        shell: pwsh
+        run: |
+          $winZip = Get-Item -Path "./dist/KMShare-*-win-x64-portable.zip" | Select-Object -First 1
+          if ($winZip) {
+            $zipSha256 = (Get-FileHash -Path $winZip.FullName -Algorithm SHA256).Hash.ToLower()
+            $vtZipGuiUrl = "https://www.virustotal.com/gui/file/$zipSha256"
+          } else {
+            $vtZipGuiUrl = "https://www.virustotal.com"
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:VT_API_KEY) -and $winZip) {
+            try {
+              Write-Host "Enviando pacote ao VirusTotal API v3..."
+              $headers = @{ "x-apikey" = $env:VT_API_KEY }
+              $fileItem = $winZip
+              if ($fileItem.Length -gt 32MB) {
+                $uploadUrlResp = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/files/upload_url" -Method Get -Headers $headers
+                $uploadUri = $uploadUrlResp.data
+              } else {
+                $uploadUri = "https://www.virustotal.com/api/v3/files"
+              }
+              $curlJson = curl.exe --silent --show-error --fail-with-body --request POST `
+                --url $uploadUri `
+                --header "x-apikey: $($env:VT_API_KEY)" `
+                --header "accept: application/json" `
+                --form "file=@$($fileItem.FullName);type=application/zip"
+              if ($LASTEXITCODE -eq 0) {
+                $uploadResp = $curlJson | ConvertFrom-Json
+                $analysisId = $uploadResp.data.id
+
+                $stats = $null
+                for ($i = 0; $i -lt 12; $i++) {
+                  Start-Sleep -Seconds 10
+                  $analysisResp = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/analyses/$analysisId" -Method Get -Headers $headers
+                  if ($analysisResp.data.attributes.status -eq "completed") {
+                    $stats = $analysisResp.data.attributes.stats
+                    break
+                  }
+                }
+
+                if ($null -ne $stats) {
+                  $malicious = $stats.malicious
+                  $suspicious = $stats.suspicious
+                  $harmless = $stats.harmless + $stats.undetected
+                  if ($malicious -eq 0 -and $suspicious -eq 0) {
+                    $vtSummary = "✅ **Limpo no VirusTotal**: `0` detecções maliciosas em `$harmless` motores antivírus."
+                  } else {
+                    $vtSummary = "⚠️ **Alerta VirusTotal**: `$malicious` maliciosos / `$suspicious` suspeitos detectados."
+                  }
+                } else {
+                  $vtSummary = "⏳ **Arquivo enviado ao VirusTotal**: Análise em processamento (veja o relatório no link)."
+                }
+              } else {
+                $vtSummary = "🔎 **Consulta direta por Hash no VirusTotal** (veja o link abaixo)."
+              }
+            } catch {
+              Write-Warning "Falha ao consultar API do VirusTotal: $_"
+              $vtSummary = "🔎 **Consulta direta por Hash no VirusTotal** (veja o link abaixo)."
+            }
+          } else {
+            $vtSummary = "🔎 **Verificação VirusTotal disponível via Hash SHA-256** (configure `secrets.VT_API_KEY` para envio automatizado)."
+          }
+
+          "vt_summary=$vtSummary" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "vt_zip_url=$vtZipGuiUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Generate GitHub Artifact Build Provenance Attestation
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: |
+            dist/*
+
+      - name: Create Git Tag & Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DEFENDER_STATUS: ${{ steps.defender_scan.outputs.defender_status }}
+          VT_SUMMARY: ${{ steps.virustotal.outputs.vt_summary }}
+          VT_ZIP_URL: ${{ steps.virustotal.outputs.vt_zip_url }}
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a $env:TAG -m "Release $env:TAG"
+          git push origin $env:TAG
+
+          $checksums256 = Get-Content -Path "./dist/CHECKSUMS.sha256" -Raw
+
+          $notes = @"
+          ## 🚀 KMShare $($env:TAG) — Multiplataforma (.NET 10)
+
+          Software KVM virtual (travessia de borda de mouse/teclado) e transferência de arquivos criptografada P2P para Intranet e Bluetooth.
+          Compilação **Single-File Zero-Dependency** — Não requer instalação do .NET Runtime.
+
+          ---
+
+          ### 📦 Downloads Disponíveis
+
+          #### 🪟 Windows (win-x64)
+          - **Instalador Oficial (User-Space / Sem Admin)**: [`KMShare-v$($env:VERSION)-win-x64-installer.exe`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64-installer.exe) *(se compilado via Inno Setup)*
+          - **Script Instalador PowerShell**: [`Install-KMShare.ps1`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/Install-KMShare.ps1)
+          - **Versão Portable (.zip)**: [`KMShare-v$($env:VERSION)-win-x64-portable.zip`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-win-x64-portable.zip)
+
+          #### 🐧 Linux (linux-x64)
+          - **Pacote Debian (.deb)**: [`KMShare-v$($env:VERSION)-linux-x64.deb`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64.deb) *(instalação via `sudo dpkg -i` ou `apt`)*
+          - **Instalador User-Space Standalone (Zero-Sudo)**: [`KMShare-v$($env:VERSION)-linux-x64-installer.sh`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64-installer.sh)
+          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-linux-x64-portable.tar.gz)
+
+          #### 🍏 macOS (osx-arm64 Apple Silicon)
+          - **Pacote macOS App Bundle (.zip)**: [`KMShare-v$($env:VERSION)-osx-arm64-app.zip`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-app.zip) *(contém `KMShare.app` e instalador)*
+          - **Script Instalador Standalone**: [`KMShare-v$($env:VERSION)-osx-arm64-installer.sh`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-installer.sh)
+          - **Versão Portable (.tar.gz)**: [`KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz`](https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/KMShare-v$($env:VERSION)-osx-arm64-portable.tar.gz)
+
+          ---
+
+          ### 🛡️ Relatório de Segurança e Varredura Antivírus
+
+          | Verificação de Segurança | Status / Resultado |
+          |---|---|
+          | **Microsoft Defender Antivirus** | $($env:DEFENDER_STATUS) |
+          | **Status VirusTotal** | $($env:VT_SUMMARY) |
+          | **Relatório VirusTotal (ZIP)** | [🔗 Abrir Relatório VirusTotal]($($env:VT_ZIP_URL)) |
+          | **SLSA Build Provenance** | Gerado automaticamente via GitHub Actions Attestations |
+
+          ---
+
+          ### 🔐 Hashes Criptográficos SHA-256 (Verificação de Integridade)
+
+          ```text
+          $checksums256
+          ```
+
+          #### Validando a integridade do download:
+          - **Windows PowerShell**: `Get-FileHash <arquivo> -Algorithm SHA256`
+          - **Linux / macOS**: `sha256sum <arquivo>` ou `shasum -a 256 <arquivo>`
+          "@
+
+          $notesFile = "./dist/RELEASE_NOTES.md"
+          Set-Content -Path $notesFile -Value $notes -Encoding UTF8
+
+          $assetList = @()
+          Get-ChildItem -Path "./dist" -File | ForEach-Object { $assetList += $_.FullName }
+
+          gh release create $env:TAG @assetList `
+            --title "KMShare $($env:TAG) — Multiplataforma" `
+            --notes-file $notesFile `
+            --generate-notes
+

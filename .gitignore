@@ -52,6 +52,7 @@ crash.dmp
 
 # OS generated files
 .claude-flow/
+.github/context-mode/
 .DS_Store
 .DS_Store?
 ._*

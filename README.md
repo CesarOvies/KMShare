@@ -31,7 +31,8 @@ O **KMShare** é uma solução multiplataforma (`win-x64`, `linux-x64`, `osx-arm
 5. [Arquitetura de Segurança e Criptografia](#5-arquitetura-de-segurança-e-criptografia)
 6. [Referência de Linha de Comando (CLI)](#6-referência-de-linha-de-comando-cli)
 7. [Compilação, Autoteste e Empacotamento Single-File](#7-compilação-autoteste-e-empacotamento-single-file)
-8. [Estrutura do Projeto e Arquivos de Apoio para IA](#8-estrutura-do-projeto-e-arquivos-de-apoio-para-ia)
+8. [Integração Contínua (CI/CD) e Política de Branches](#8-integração-contínua-cicd-e-política-de-branches)
+9. [Estrutura do Projeto e Arquivos de Apoio para IA](#9-estrutura-do-projeto-e-arquivos-de-apoio-para-ia)
 
 ---
 
@@ -187,18 +188,45 @@ dotnet build KMShare.csproj
 dotnet run --project KMShare.csproj -- --self-test
 ```
 
-### Gerar Executáveis Single-File de Produção (`./dist/`)
+### Gerar Executáveis Single-File e Pacotes de Distribuição (`./dist/`)
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build-all.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-all.ps1 -Version "1.0.0" -PackageAll -ScanDefender
 ```
-O script gera os binários `KMShare` e `kmshare-updater` prontos para distribuição em:
-- `dist/win-x64/KMShare.exe`
-- `dist/linux-x64/KMShare`
-- `dist/osx-arm64/KMShare`
+O script gera compilações Single-File Self-Contained prontas para uso em todos os sistemas operacionais, empacota portables e instaladores, calcula hashes criptográficos e executa a varredura profunda do **Microsoft Defender Antivirus**:
+- **Windows (`win-x64`)**:
+  - `dist/KMShare-v1.0.0-win-x64-portable.zip` (Portable com `KMShare.exe` e `kmshare-updater.exe`)
+  - `dist/KMShare-v1.0.0-win-x64-installer.exe` (Instalador Inno Setup no escopo `asInvoker` em `%LOCALAPPDATA%\Programs\KMShare`)
+  - `dist/Install-KMShare.ps1` (Script instalador standalone User-Space)
+- **Linux (`linux-x64`)**:
+  - `dist/KMShare-v1.0.0-linux-x64-portable.tar.gz` (Portable com executáveis e lançador)
+  - `dist/KMShare-v1.0.0-linux-x64.deb` (Pacote Debian com atalho `.desktop` e ícone)
+  - `dist/KMShare-v1.0.0-linux-x64-installer.sh` (Instalador standalone User-Space para qualquer distro)
+- **macOS (`osx-arm64` Apple Silicon)**:
+  - `dist/KMShare-v1.0.0-osx-arm64-portable.tar.gz` (Portable com executáveis)
+  - `dist/KMShare-v1.0.0-osx-arm64-app.zip` (Pacote `KMShare.app` com `Info.plist` pronto para `Applications`)
+  - `dist/KMShare-v1.0.0-osx-arm64-installer.sh` (Script instalador de integração com o sistema)
+- **Segurança e Integridade**:
+  - `dist/CHECKSUMS.sha256` e `dist/CHECKSUMS.sha512`
+  - Varredura profunda com **Microsoft Defender Antivirus** (`MpCmdRun.exe`)
 
 ---
 
-## 8. Estrutura do Projeto e Arquivos de Apoio para IA
+## 8. Integração Contínua (CI/CD) e Política de Branches
+
+O projeto adota o fluxo de segmentação **Gitflow** padronizado com o projeto **GitCommitMigrator**:
+
+| Branch | Papel | Política de Pull Request e CI |
+|---|---|---|
+| `main` | Produção e Releases Oficiais | Aceita PRs **exclusivamente** de `develop`. Dispara o pipeline `release.yml` para compilação multiplataforma, empacotamento, scan Microsoft Defender e publicação da Release no GitHub. |
+| `develop` | Integração Contínua e Desenvolvimento | Aceita PRs de branches de feature e correções (`feature/...`, `fix/...`). Dispara o pipeline `build-artifacts.yml` disponibilizando os binários mais recentes diretamente na aba de Actions do Git. |
+
+- **Validador de Política de Branches (`ci.yml`)**: Bloqueia e fecha automaticamente qualquer Pull Request fora da hierarquia permitida (`develop -> main` ou `feature/fix -> develop`).
+- **Autoteste de Segurança Obrigatório**: Todos os 10 testes de segurança, integridade de sockets, criptografia e isolamento intranet precisam passar com sucesso (`0 warnings`, `0 errors`) antes do merge.
+- **Sincronização Automática (`sync-develop.yml`)**: Mantém a branch `develop` sempre atualizada com a `main` após cada release e impede a deleção acidental de `develop`.
+
+---
+
+## 9. Estrutura do Projeto e Arquivos de Apoio para IA
 
 ```text
 KMShare/
@@ -207,8 +235,19 @@ KMShare/
 ├── AGENTS.md                                  # Guia de contexto, arquitetura e regras para agentes de IA
 ├── MAINTENANCE.md                             # Manual de sustentação, invariantes de SO e protocolos de rede
 ├── .agent/rules/kmshare.md                    # Regra ativa para assistentes de IA no workspace
+├── .github/
+│   ├── pull_request_template.md               # Template oficial de Pull Request
+│   └── workflows/
+│       ├── ci.yml                             # Política de branches, build e autoteste de segurança
+│       ├── release.yml                        # Pipeline de release, empacotamento, Defender scan e publicação
+│       ├── build-artifacts.yml                # Compilação contínua e publicação de artefatos na branch develop
+│       └── sync-develop.yml                   # Proteção e sincronização automática de main para develop
+├── packaging/
+│   ├── windows/                               # Script Inno Setup (KMShare.iss) e instalador PowerShell
+│   ├── linux/                                 # Lançador .desktop, empacotador Debian (.deb) e instalador .sh
+│   └── macos/                                 # Info.plist, App Bundle builder e instalador macOS .sh
 ├── app.manifest                               # Manifesto User-Space (asInvoker, Common-Controls v6)
-├── build-all.ps1                              # Script de publicação Single-File (win-x64, linux-x64, osx-arm64)
+├── build-all.ps1                              # Script mestre de publicação e empacotamento multiplataforma
 ├── KMShare.csproj                             # Projeto principal (.NET 10, zero pacotes externos)
 ├── Program.cs                                 # Entrypoint GUI / CLI + Suíte de Verificação (--self-test)
 ├── src/

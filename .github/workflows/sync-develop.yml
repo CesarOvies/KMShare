@@ -1,0 +1,51 @@
+name: Sync & Protect Develop Branch
+
+on:
+  push:
+    branches:
+      - main
+  delete:
+
+permissions:
+  contents: write
+
+jobs:
+  restore-develop-if-deleted:
+    name: Prevent Deletion of Develop Branch
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch' && github.event.ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main to restore develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Recreate develop branch immediately
+        run: |
+          echo "⚠️ Tentativa de exclusão da branch 'develop' detectada! Restaurando automaticamente a partir da 'main'..."
+          git push origin HEAD:refs/heads/develop
+
+  sync-develop:
+    name: Merge main into develop
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure develop exists and merge origin/main into develop
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+          if git show-ref --verify --quiet refs/remotes/origin/develop; then
+            git checkout -B develop origin/develop
+            git merge origin/main --no-edit -m "chore: sync develop with main"
+          else
+            git checkout -B develop origin/main
+          fi
+          git push origin develop
+
